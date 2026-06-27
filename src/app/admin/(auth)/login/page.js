@@ -51,7 +51,7 @@ export default function AdminLoginPage() {
             />
           </div>
           <h1 className="text-2xl font-bold text-foreground leading-snug">
-            Buku Tamu <span className="gradient-text">Digital</span>
+            Buku Tamu <span className="text-black">Digital</span>
           </h1>
           <p className="text-sm font-semibold text-muted mt-1">
             STIKOM PGRI Banyuwangi
