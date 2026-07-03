@@ -3,15 +3,30 @@
 import { useState } from "react";
 import Input from "./Input";
 
-export default function GuestTable({ guests }) {
-  const [search, setSearch] = useState("");
+const statusMap = {
+  reguler: { badge: "bg-info-muted text-info border border-info/20", label: "Reguler" },
+  vip: { badge: "bg-warning-muted text-warning border border-warning/20", label: "VIP" },
+  vvip: { badge: "bg-danger-muted text-danger border border-danger/20", label: "VVIP" },
+};
 
-  const filtered = guests.filter(
-    (g) =>
+export default function GuestTable({ guests, showEvent = false, events = [] }) {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+
+  const getEventName = (acara_id) => {
+    const event = events.find((e) => e.id === acara_id);
+    return event ? event.nama_acara : "—";
+  };
+
+  const filtered = guests.filter((g) => {
+    const matchSearch =
       g.nama.toLowerCase().includes(search.toLowerCase()) ||
       g.instansi.toLowerCase().includes(search.toLowerCase()) ||
-      g.tujuan.toLowerCase().includes(search.toLowerCase())
-  );
+      g.tujuan.toLowerCase().includes(search.toLowerCase()) ||
+      (g.no_hp || "").includes(search);
+    const matchStatus = !statusFilter || g.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
 
   const formatTime = (dateStr) => {
     return new Date(dateStr).toLocaleTimeString("id-ID", {
@@ -28,33 +43,47 @@ export default function GuestTable({ guests }) {
     });
   };
 
+  const cols = showEvent ? 9 : 7;
+
   return (
     <div className="space-y-4">
       {/* Search & Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <Input
-            placeholder="Cari nama, instansi, atau tujuan..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            icon={
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            }
-          />
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <div className="relative w-full sm:w-64">
+            <Input
+              placeholder="Cari nama, instansi, atau tujuan..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              icon={
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              }
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full sm:w-40 rounded-xl bg-input border border-input-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-input-focus transition-all duration-200"
+          >
+            <option value="">Semua Status</option>
+            <option value="reguler">Reguler</option>
+            <option value="vip">VIP</option>
+            <option value="vvip">VVIP</option>
+          </select>
         </div>
-        <p className="text-sm text-muted">
+        <p className="text-sm text-muted whitespace-nowrap">
           Menampilkan{" "}
           <span className="text-foreground font-medium">{filtered.length}</span>{" "}
           dari {guests.length} tamu
@@ -77,6 +106,14 @@ export default function GuestTable({ guests }) {
                   Instansi
                 </th>
                 <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">
+                  Status
+                </th>
+                {showEvent && (
+                  <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">
+                    Acara
+                  </th>
+                )}
+                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">
                   Tujuan
                 </th>
                 <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">
@@ -91,7 +128,7 @@ export default function GuestTable({ guests }) {
               {filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={cols}
                     className="text-center py-12 text-muted text-sm"
                   >
                     <div className="flex flex-col items-center gap-2">
@@ -138,6 +175,18 @@ export default function GuestTable({ guests }) {
                     <td className="px-5 py-3.5 text-sm text-muted">
                       {guest.instansi}
                     </td>
+                    <td className="px-5 py-3.5">
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${(statusMap[guest.status] || statusMap.reguler).badge}`}>
+                        {(statusMap[guest.status] || statusMap.reguler).label}
+                      </span>
+                    </td>
+                    {showEvent && (
+                      <td className="px-5 py-3.5">
+                        <span className="text-xs bg-accent-muted text-accent px-2.5 py-1 rounded-full font-medium">
+                          {getEventName(guest.acara_id)}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-5 py-3.5">
                       <span className="text-xs bg-accent-muted text-accent px-2.5 py-1 rounded-full font-medium">
                         {guest.tujuan}

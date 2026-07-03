@@ -1,9 +1,15 @@
 import Navbar from "@/components/Navbar";
 import StatCard from "@/components/StatCard";
 import EventCard from "@/components/EventCard";
-import { dummyEvents, dashboardStats } from "@/lib/dummy-data";
+import { dummyEvents, dummyGuests } from "@/lib/dummy-data";
 
 export default function DashboardPage() {
+  const totalEvents = dummyEvents.length;
+  const totalGuests = dummyGuests.length;
+  const todayGuests = dummyGuests.filter(
+    (g) => g.waktu_kedatangan?.startsWith(new Date().toISOString().slice(0, 10))
+  ).length;
+  const activeEvents = dummyEvents.filter((e) => e.status === "active").length;
   const recentEvents = dummyEvents.slice(0, 4);
 
   return (
@@ -18,9 +24,8 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
           <StatCard
             title="Total Acara"
-            value={dashboardStats.totalEvents}
+            value={totalEvents}
             color="accent"
-            trend="+2 bulan ini"
             icon={
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -29,9 +34,9 @@ export default function DashboardPage() {
           />
           <StatCard
             title="Total Tamu"
-            value={dashboardStats.totalGuests}
+            value={totalGuests}
             color="success"
-            trend="+48 minggu ini"
+
             icon={
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -40,7 +45,7 @@ export default function DashboardPage() {
           />
           <StatCard
             title="Tamu Hari Ini"
-            value={dashboardStats.todayGuests}
+            value={todayGuests}
             color="info"
             icon={
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -50,7 +55,7 @@ export default function DashboardPage() {
           />
           <StatCard
             title="Acara Aktif"
-            value={dashboardStats.activeEvents}
+            value={activeEvents}
             color="warning"
             icon={
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -80,65 +85,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Quick Activity */}
-        <div className="glass-card rounded-2xl p-6">
-          <h3 className="text-sm font-bold text-foreground mb-4">
-            Aktivitas Terakhir
-          </h3>
-          <div className="space-y-4">
-            {[
-              {
-                name: "Ahmad Fauzi",
-                action: "mendaftar di",
-                event: "Seminar AI 2026",
-                time: "2 menit lalu",
-                color: "bg-success",
-              },
-              {
-                name: "Siti Nurhaliza",
-                action: "mendaftar di",
-                event: "Seminar AI 2026",
-                time: "5 menit lalu",
-                color: "bg-accent",
-              },
-              {
-                name: "Dimas Aditya",
-                action: "mendaftar di",
-                event: "Workshop React Advanced",
-                time: "15 menit lalu",
-                color: "bg-info",
-              },
-              {
-                name: "Fajar Nugroho",
-                action: "mendaftar di",
-                event: "Job Fair 2026",
-                time: "1 jam lalu",
-                color: "bg-warning",
-              },
-            ].map((activity, idx) => (
-              <div
-                key={idx}
-                className="flex items-center gap-3 text-sm group"
-              >
-                <div
-                  className={`w-2 h-2 rounded-full ${activity.color} shrink-0`}
-                ></div>
-                <p className="text-muted flex-1">
-                  <span className="text-foreground font-medium">
-                    {activity.name}
-                  </span>{" "}
-                  {activity.action}{" "}
-                  <span className="text-accent font-medium">
-                    {activity.event}
-                  </span>
-                </p>
-                <span className="text-xs text-muted/60 shrink-0">
-                  {activity.time}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </>
   );
