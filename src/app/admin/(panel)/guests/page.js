@@ -17,9 +17,8 @@ export default function GuestsPage() {
   const [newGuest, setNewGuest] = useState({
     nama: "",
     instansi: "",
-    tujuan: "",
     no_hp: "",
-    status: "reguler",
+    kategori_tamu: "reguler",
   });
 
   // Import state
@@ -42,15 +41,15 @@ export default function GuestsPage() {
       id: Date.now(),
       nama: newGuest.nama,
       instansi: newGuest.instansi,
-      tujuan: newGuest.tujuan,
       no_hp: newGuest.no_hp,
-      status: newGuest.status,
-      waktu_kedatangan: new Date().toISOString(),
+      kategori_tamu: newGuest.kategori_tamu,
+      status_kehadiran: "hadir",
+      created_at: new Date().toISOString(),
       acara_id: 0,
     };
     setGuests([guest, ...guests]);
     setShowModal(false);
-    setNewGuest({ nama: "", instansi: "", tujuan: "", no_hp: "", status: "reguler" });
+    setNewGuest({ nama: "", instansi: "", no_hp: "", kategori_tamu: "reguler" });
     showToast("Tamu berhasil ditambahkan!");
   };
 
@@ -99,10 +98,10 @@ export default function GuestsPage() {
         id: Date.now() + idx,
         nama: row.nama || "",
         instansi: row.instansi || "",
-        tujuan: row.tujuan || "",
         no_hp: row.no_hp || "",
-        status: (row.status || "reguler").toLowerCase(),
-        waktu_kedatangan: row.waktu_kedatangan || new Date().toISOString(),
+        kategori_tamu: (row.kategori_tamu || "reguler").toLowerCase(),
+        status_kehadiran: (row.status_kehadiran || "hadir").toLowerCase(),
+        created_at: row.created_at || new Date().toISOString(),
         acara_id: parseInt(row.acara_id) || 0,
       }));
       setGuests([...newGuests, ...guests]);
@@ -201,23 +200,6 @@ export default function GuestsPage() {
                   </button>
                 </div>
 
-                {/* Format Info */}
-                <div className="p-4 rounded-xl bg-info/5 border border-info/20 mb-6">
-                  <h3 className="text-sm font-semibold text-info mb-2">Format File CSV</h3>
-                  <p className="text-xs text-muted mb-3">Kolom yang tersedia (header wajib menggunakan nama di bawah):</p>
-                  <div className="bg-background/50 rounded-lg p-3 font-mono text-[11px] sm:text-xs text-muted overflow-x-auto">
-                    <p className="text-foreground/80 font-semibold mb-1">Baris 1 (header):</p>
-                    <p className="whitespace-pre">nama,instansi,tujuan,no_hp,status,acara_id</p>
-                    <p className="text-foreground/80 font-semibold mt-3 mb-1">Baris 2+ (data):</p>
-                    <p className="whitespace-pre">Ahmad Fauzi,Universitas Airlangga,Seminar,081234567890,reguler,1</p>
-                    <p className="whitespace-pre">Siti Aminah,UGM,Workshop,,vip,1</p>
-                  </div>
-                  <div className="mt-3 space-y-1">
-                    <p className="text-[11px] text-muted">• <span className="text-foreground/80">status:</span> reguler, vip, atau vvip (default: reguler)</p>
-                    <p className="text-[11px] text-muted">• <span className="text-foreground/80">acara_id:</span> ID acara tujuan (lihat menu Kelola Acara)</p>
-                    <p className="text-[11px] text-muted">• Kolom yang tidak diisi bisa dikosongkan</p>
-                  </div>
-                </div>
 
                 {/* File Upload */}
                 <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-8 sm:p-12 text-center hover:border-accent/50 transition-colors cursor-pointer" onClick={() => document.getElementById("csv-file-input").click()}>
@@ -255,30 +237,36 @@ export default function GuestsPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-muted/10 border-b border-border">
-                        <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-4 py-3">#</th>
                         <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-4 py-3">Nama</th>
                         <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-4 py-3">Instansi</th>
-                        <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-4 py-3">Tujuan</th>
+                        <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-4 py-3">Kategori</th>
                         <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-4 py-3">No. HP</th>
-                        <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-4 py-3">Status</th>
+                        <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-4 py-3">Status Kehadiran</th>
                         <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-4 py-3">Acara</th>
                       </tr>
                     </thead>
                     <tbody>
                       {importPreview.map((row, idx) => (
                         <tr key={idx} className="border-b border-border/50 last:border-0">
-                          <td className="px-4 py-3 text-xs text-muted">{idx + 1}</td>
-                          <td className="px-4 py-3 text-sm font-medium text-foreground">{row.nama}</td>
+                          <td className="px-4 py-3 text-sm font-medium text-foreground">{row.nama || "—"}</td>
                           <td className="px-4 py-3 text-sm text-muted">{row.instansi || "—"}</td>
-                          <td className="px-4 py-3 text-sm text-muted">{row.tujuan || "—"}</td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                              (row.kategori_tamu || "reguler") === "vip" ? "bg-warning-muted text-warning border border-warning/20" :
+                              (row.kategori_tamu || "reguler") === "vvip" ? "bg-danger-muted text-danger border border-danger/20" :
+                              "bg-info-muted text-info border border-info/20"
+                            }`}>
+                              {(row.kategori_tamu || "reguler").charAt(0).toUpperCase() + (row.kategori_tamu || "reguler").slice(1)}
+                            </span>
+                          </td>
                           <td className="px-4 py-3 text-sm text-muted font-mono">{row.no_hp || "—"}</td>
                           <td className="px-4 py-3">
                             <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                              (row.status || "reguler") === "vip" ? "bg-warning-muted text-warning border border-warning/20" :
-                              (row.status || "reguler") === "vvip" ? "bg-danger-muted text-danger border border-danger/20" :
-                              "bg-info-muted text-info border border-info/20"
+                              (row.status_kehadiran || "hadir") === "terlambat" ? "bg-warning-muted text-warning border border-warning/20" :
+                              (row.status_kehadiran || "hadir") === "tidak_hadir" ? "bg-danger-muted text-danger border border-danger/20" :
+                              "bg-success-muted text-success border border-success/20"
                             }`}>
-                              {(row.status || "reguler").charAt(0).toUpperCase() + (row.status || "reguler").slice(1)}
+                              {(row.status_kehadiran || "Hadir").charAt(0).toUpperCase() + (row.status_kehadiran || "hadir").slice(1)}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-muted">{row.acara_id || "—"}</td>
@@ -359,19 +347,6 @@ export default function GuestsPage() {
                 }
               />
               <Input
-                id="guest-tujuan"
-                label="Tujuan Kunjungan"
-                placeholder="Contoh: Menghadiri Seminar"
-                value={newGuest.tujuan}
-                onChange={(e) => setNewGuest({ ...newGuest, tujuan: e.target.value })}
-                required
-                icon={
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                }
-              />
-              <Input
                 id="guest-phone"
                 label="Nomor HP"
                 type="tel"
@@ -386,11 +361,11 @@ export default function GuestsPage() {
               />
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-foreground/80">
-                  Status Tamu <span className="text-danger ml-1">*</span>
+                  Kategori <span className="text-danger ml-1">*</span>
                 </label>
                 <select
-                  value={newGuest.status}
-                  onChange={(e) => setNewGuest({ ...newGuest, status: e.target.value })}
+                  value={newGuest.kategori_tamu}
+                  onChange={(e) => setNewGuest({ ...newGuest, kategori_tamu: e.target.value })}
                   className="w-full rounded-xl bg-input border border-input-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-input-focus transition-all duration-200"
                   required
                 >

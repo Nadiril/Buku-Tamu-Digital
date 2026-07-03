@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import GuestTable from "@/components/GuestTable";
-import QRCodeCard from "@/components/QRCodeCard";
 import { dummyEvents, dummyGuests } from "@/lib/dummy-data";
 
 export async function generateStaticParams() {
@@ -45,9 +44,9 @@ export default async function EventDetailPage({ params }) {
         </div>
 
         {/* Info Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           {/* Main Info */}
-          <div className="lg:col-span-2 glass-card rounded-2xl p-6 space-y-5">
+          <div className="glass-card rounded-2xl p-6 space-y-5">
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-xl font-bold text-foreground">{event.nama_acara}</h2>
@@ -64,9 +63,6 @@ export default async function EventDetailPage({ params }) {
               <InfoBox label="Link Form" value={`/event/${event.slug}`} color="text-info" icon={<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />} mono />
             </div>
           </div>
-
-          {/* QR Code */}
-          <QRCodeCard slug={event.slug} />
         </div>
 
         {/* Guest List */}
@@ -90,54 +86,3 @@ function InfoBox({ label, value, color, icon, mono }) {  return (
   );
 }
 
-function QRPlaceholder() {
-  return (
-    <svg viewBox="0 0 200 200" className="w-full h-full">
-      <rect width="200" height="200" fill="white" />
-      <rect x="10" y="10" width="50" height="50" fill="black" />
-      <rect x="15" y="15" width="40" height="40" fill="white" />
-      <rect x="20" y="20" width="30" height="30" fill="black" />
-      <rect x="140" y="10" width="50" height="50" fill="black" />
-      <rect x="145" y="15" width="40" height="40" fill="white" />
-      <rect x="150" y="20" width="30" height="30" fill="black" />
-      <rect x="10" y="140" width="50" height="50" fill="black" />
-      <rect x="15" y="145" width="40" height="40" fill="white" />
-      <rect x="20" y="150" width="30" height="30" fill="black" />
-      <rect x="70" y="10" width="10" height="10" fill="black" />
-      <rect x="90" y="10" width="10" height="10" fill="black" />
-      <rect x="110" y="10" width="10" height="10" fill="black" />
-      <rect x="70" y="30" width="10" height="10" fill="black" />
-      <rect x="100" y="30" width="10" height="10" fill="black" />
-      <rect x="120" y="30" width="10" height="10" fill="black" />
-      <rect x="80" y="50" width="10" height="10" fill="black" />
-      <rect x="110" y="50" width="10" height="10" fill="black" />
-      <rect x="70" y="70" width="10" height="10" fill="black" />
-      <rect x="90" y="70" width="10" height="10" fill="black" />
-      <rect x="110" y="70" width="10" height="10" fill="black" />
-      <rect x="130" y="70" width="10" height="10" fill="black" />
-      <rect x="150" y="70" width="10" height="10" fill="black" />
-      <rect x="170" y="70" width="10" height="10" fill="black" />
-      <rect x="10" y="70" width="10" height="10" fill="black" />
-      <rect x="30" y="70" width="10" height="10" fill="black" />
-      <rect x="50" y="70" width="10" height="10" fill="black" />
-      <rect x="80" y="90" width="10" height="10" fill="black" />
-      <rect x="100" y="90" width="10" height="10" fill="black" />
-      <rect x="120" y="90" width="10" height="10" fill="black" />
-      <rect x="70" y="110" width="10" height="10" fill="black" />
-      <rect x="90" y="110" width="10" height="10" fill="black" />
-      <rect x="130" y="110" width="10" height="10" fill="black" />
-      <rect x="160" y="110" width="10" height="10" fill="black" />
-      <rect x="80" y="130" width="10" height="10" fill="black" />
-      <rect x="110" y="130" width="10" height="10" fill="black" />
-      <rect x="140" y="130" width="10" height="10" fill="black" />
-      <rect x="70" y="150" width="10" height="10" fill="black" />
-      <rect x="100" y="150" width="10" height="10" fill="black" />
-      <rect x="120" y="150" width="10" height="10" fill="black" />
-      <rect x="160" y="150" width="10" height="10" fill="black" />
-      <rect x="80" y="170" width="10" height="10" fill="black" />
-      <rect x="110" y="170" width="10" height="10" fill="black" />
-      <rect x="140" y="170" width="10" height="10" fill="black" />
-      <rect x="170" y="170" width="10" height="10" fill="black" />
-    </svg>
-  );
-}

@@ -1,6 +1,16 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function EventCard({ event }) {
+  const router = useRouter();
+
+  const handleRegistrasi = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    router.push(`/admin/scan-qr?eventId=${event.id}`);
+  };
   const statusStyles = {
     active: {
       badge: "bg-success-muted text-success border border-success/20",
@@ -110,8 +120,17 @@ export default function EventCard({ event }) {
           </div>
         </div>
 
-        {/* Footer arrow */}
-        <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-end">
+        {/* Footer actions */}
+        <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between gap-2">
+          <span
+            onClick={handleRegistrasi}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-all duration-200 cursor-pointer"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Registrasi Tamu
+          </span>
           <span className="text-xs text-muted group-hover:text-accent transition-colors duration-200 flex items-center gap-1">
             Lihat Detail
             <svg

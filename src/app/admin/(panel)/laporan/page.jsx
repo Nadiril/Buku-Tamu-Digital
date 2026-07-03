@@ -68,8 +68,8 @@ export default function LaporanPage() {
               className="w-full rounded-xl bg-input border border-input-border pl-10 pr-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-input-focus transition-all duration-200 appearance-none cursor-pointer"
             >
               <option value="">Semua Acara</option>
-              <option value="wisuda">Wisuda 2026</option>
-              <option value="seminar">Seminar Kampus</option>
+              <option value="wisuda">Wisuda STIKOM PGRI Banyuwangi</option>
+             
             </select>
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto">

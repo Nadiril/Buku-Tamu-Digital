@@ -3,15 +3,21 @@
 import { useState } from "react";
 import Input from "./Input";
 
-const statusMap = {
+const kategoriMap = {
   reguler: { badge: "bg-info-muted text-info border border-info/20", label: "Reguler" },
   vip: { badge: "bg-warning-muted text-warning border border-warning/20", label: "VIP" },
   vvip: { badge: "bg-danger-muted text-danger border border-danger/20", label: "VVIP" },
 };
 
+const statusKehadiranMap = {
+  hadir: { badge: "bg-success-muted text-success border border-success/20", label: "Hadir" },
+  terlambat: { badge: "bg-warning-muted text-warning border border-warning/20", label: "Terlambat" },
+  tidak_hadir: { badge: "bg-danger-muted text-danger border border-danger/20", label: "Tidak Hadir" },
+};
+
 export default function GuestTable({ guests, showEvent = false, events = [] }) {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [kategoriFilter, setKategoriFilter] = useState("");
 
   const getEventName = (acara_id) => {
     const event = events.find((e) => e.id === acara_id);
@@ -22,10 +28,9 @@ export default function GuestTable({ guests, showEvent = false, events = [] }) {
     const matchSearch =
       g.nama.toLowerCase().includes(search.toLowerCase()) ||
       g.instansi.toLowerCase().includes(search.toLowerCase()) ||
-      g.tujuan.toLowerCase().includes(search.toLowerCase()) ||
       (g.no_hp || "").includes(search);
-    const matchStatus = !statusFilter || g.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchKategori = !kategoriFilter || g.kategori_tamu === kategoriFilter;
+    return matchSearch && matchKategori;
   });
 
   const formatTime = (dateStr) => {
@@ -43,7 +48,7 @@ export default function GuestTable({ guests, showEvent = false, events = [] }) {
     });
   };
 
-  const cols = showEvent ? 9 : 7;
+  const cols = showEvent ? 7 : 6;
 
   return (
     <div className="space-y-4">
@@ -52,7 +57,7 @@ export default function GuestTable({ guests, showEvent = false, events = [] }) {
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           <div className="relative w-full sm:w-64">
             <Input
-              placeholder="Cari nama, instansi, atau tujuan..."
+              placeholder="Cari nama, instansi, atau no. HP..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               icon={
@@ -73,11 +78,11 @@ export default function GuestTable({ guests, showEvent = false, events = [] }) {
             />
           </div>
           <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full sm:w-40 rounded-xl bg-input border border-input-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-input-focus transition-all duration-200"
+            value={kategoriFilter}
+            onChange={(e) => setKategoriFilter(e.target.value)}
+            className="w-full sm:w-44 rounded-xl bg-input border border-input-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-input-focus transition-all duration-200"
           >
-            <option value="">Semua Status</option>
+            <option value="">Semua Kategori</option>
             <option value="reguler">Reguler</option>
             <option value="vip">VIP</option>
             <option value="vvip">VVIP</option>
@@ -93,34 +98,31 @@ export default function GuestTable({ guests, showEvent = false, events = [] }) {
       {/* Table */}
       <div className="glass-card rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[700px]">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">
-                  #
-                </th>
-                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">
+                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5 w-[22%]">
                   Nama
                 </th>
-                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">
+                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5 w-[18%]">
                   Instansi
                 </th>
-                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">
-                  Status
+                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5 w-[13%]">
+                  Kategori
                 </th>
                 {showEvent && (
-                  <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">
+                  <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5 w-[20%]">
                     Acara
                   </th>
                 )}
-                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">
-                  Tujuan
-                </th>
-                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">
+                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5 w-[13%]">
                   No. HP
                 </th>
-                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">
-                  Waktu
+                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5 w-[15%]">
+                  Status Kehadiran
+                </th>
+                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5 w-[15%]">
+                  Created
                 </th>
               </tr>
             </thead>
@@ -129,11 +131,11 @@ export default function GuestTable({ guests, showEvent = false, events = [] }) {
                 <tr>
                   <td
                     colSpan={cols}
-                    className="text-center py-12 text-muted text-sm"
+                    className="text-center py-16 text-muted text-sm"
                   >
-                    <div className="flex flex-col items-center gap-2">
+                    <div className="flex flex-col items-center gap-3">
                       <svg
-                        className="w-10 h-10 text-muted/40"
+                        className="w-14 h-14 text-muted/30"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -141,25 +143,22 @@ export default function GuestTable({ guests, showEvent = false, events = [] }) {
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          strokeWidth={1.5}
+                          strokeWidth={1.2}
                           d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
                         />
                       </svg>
-                      <p>Tidak ada tamu ditemukan</p>
+                      <p className="text-foreground/60 font-medium">Belum ada data tamu.</p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                filtered.map((guest, idx) => (
+                filtered.map((guest) => (
                   <tr
                     key={guest.id}
                     className="border-b border-border/50 table-row-hover"
                   >
-                    <td className="px-5 py-3.5 text-sm text-muted">
-                      {idx + 1}
-                    </td>
                     <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 max-w-full">
                         <div className="w-8 h-8 rounded-full bg-accent-muted text-accent flex items-center justify-center text-xs font-bold shrink-0">
                           {guest.nama
                             .split(" ")
@@ -167,41 +166,57 @@ export default function GuestTable({ guests, showEvent = false, events = [] }) {
                             .join("")
                             .slice(0, 2)}
                         </div>
-                        <span className="text-sm font-medium text-foreground">
+                        <span
+                          className="text-sm font-medium text-foreground truncate max-w-[200px] lg:max-w-[280px]"
+                          title={guest.nama}
+                        >
                           {guest.nama}
                         </span>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-sm text-muted">
-                      {guest.instansi}
+                    <td className="px-5 py-3.5">
+                      <span
+                        className="text-sm text-muted block truncate max-w-[160px] lg:max-w-[220px]"
+                        title={guest.instansi}
+                      >
+                        {guest.instansi}
+                      </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${(statusMap[guest.status] || statusMap.reguler).badge}`}>
-                        {(statusMap[guest.status] || statusMap.reguler).label}
+                      <span
+                        className={`text-xs font-semibold px-2.5 py-1 rounded-full inline-block whitespace-nowrap ${
+                          (kategoriMap[guest.kategori_tamu] || kategoriMap.reguler).badge
+                        }`}
+                      >
+                        {(kategoriMap[guest.kategori_tamu] || kategoriMap.reguler).label}
                       </span>
                     </td>
                     {showEvent && (
                       <td className="px-5 py-3.5">
-                        <span className="text-xs bg-accent-muted text-accent px-2.5 py-1 rounded-full font-medium">
+                        <span className="text-xs bg-accent-muted text-accent px-2.5 py-1 rounded-full font-medium inline-block whitespace-nowrap max-w-[200px] truncate" title={getEventName(guest.acara_id)}>
                           {getEventName(guest.acara_id)}
                         </span>
                       </td>
                     )}
-                    <td className="px-5 py-3.5">
-                      <span className="text-xs bg-accent-muted text-accent px-2.5 py-1 rounded-full font-medium">
-                        {guest.tujuan}
-                      </span>
-                    </td>
                     <td className="px-5 py-3.5 text-sm text-muted font-mono">
                       {guest.no_hp || "—"}
                     </td>
                     <td className="px-5 py-3.5">
-                      <div className="text-sm">
+                      <span
+                        className={`text-xs font-semibold px-2.5 py-1 rounded-full inline-block whitespace-nowrap ${
+                          (statusKehadiranMap[guest.status_kehadiran] || statusKehadiranMap.hadir).badge
+                        }`}
+                      >
+                        {(statusKehadiranMap[guest.status_kehadiran] || statusKehadiranMap.hadir).label}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="text-sm whitespace-nowrap">
                         <p className="text-foreground/80 font-medium">
-                          {formatTime(guest.waktu_kedatangan)}
+                          {formatTime(guest.created_at)}
                         </p>
                         <p className="text-xs text-muted">
-                          {formatDate(guest.waktu_kedatangan)}
+                          {formatDate(guest.created_at)}
                         </p>
                       </div>
                     </td>

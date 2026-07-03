@@ -1,18 +1,26 @@
 "use client";
 
+import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
 import Navbar from "@/components/Navbar";
 import QRScanner from "@/components/scanner/QRScanner";
 import Button from "@/components/Button";
 import Toast from "@/components/Toast";
-import { UserRound, Clock, CheckCircle, Calendar, Hash, GraduationCap, User, Send } from "lucide-react";
-import { useState } from "react";
+import { dummyEvents } from "@/lib/dummy-data";
+import { UserRound, Clock, CheckCircle, Calendar, Hash, GraduationCap, User, Send, ArrowLeft, QrCode } from "lucide-react";
 
-export default function ScanQRPage() {
+function ScanQRContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const eventId = searchParams.get("eventId");
+  const selectedEvent = dummyEvents.find((e) => e.id === parseInt(eventId));
+
   const [scanned, setScanned] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [scanKey, setScanKey] = useState(0);
   const [toast, setToast] = useState(null);
+  const [scanHistory, setScanHistory] = useState([]);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type, id: Date.now() });
@@ -30,6 +38,17 @@ export default function ScanQRPage() {
     setTimeout(() => {
       setSubmitting(false);
       setSubmitted(true);
+      setScanHistory((prev) => [
+        {
+          id: Date.now(),
+          name: dummyGuest.name,
+          nim: dummyGuest.nim,
+          prodi: dummyGuest.prodi,
+          event: selectedEvent?.nama_acara || dummyGuest.event,
+          time: "Baru saja",
+        },
+        ...prev,
+      ]);
       showToast("Kehadiran tamu berhasil dicatat!");
       setTimeout(resetScan, 1500);
     }, 1500);
@@ -45,14 +64,69 @@ export default function ScanQRPage() {
     name: "M. Nadiril Khoir",
     nim: "3125101308",
     prodi: "D3 Manajemen Informatika",
-    event: "Wisuda STIKOM PGRI Banyuwangi 2026",
+    event: selectedEvent?.nama_acara || "Wisuda STIKOM PGRI Banyuwangi 2026",
   };
+
+  const statusStyles = {
+    active: { badge: "bg-success-muted text-success", dot: "bg-success" },
+    upcoming: { badge: "bg-info-muted text-info", dot: "bg-info" },
+    completed: { badge: "bg-muted/20 text-muted", dot: "bg-muted" },
+  };
+
+  if (!selectedEvent) {
+    return (
+      <>
+        <Navbar
+          title="Registrasi Tamu"
+          subtitle="Pilih acara untuk memulai registrasi tamu"
+        />
+        <div className="flex-1 p-6 space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {dummyEvents.map((event) => {
+              const s = statusStyles[event.status] || statusStyles.upcoming;
+              return (
+                <button
+                  key={event.id}
+                  onClick={() => router.push(`/admin/scan-qr?eventId=${event.id}`)}
+                  className="glass-card rounded-2xl p-5 hover:border-border-hover hover:bg-card-hover transition-all duration-300 text-left w-full cursor-pointer group"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+                      <QrCode className="w-5 h-5 text-accent" />
+                    </div>
+                    <span className={`${s.badge} text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5 ml-3 whitespace-nowrap`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`}></span>
+                      {s.label || event.status}
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
+                    {event.nama_acara}
+                  </h3>
+                  <p className="text-xs text-muted mt-1">{event.lokasi}</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
       <Navbar
-        title="Scan QR"
-        subtitle="Halaman ini digunakan untuk scan QR Code tamu saat registrasi."
+        title={`Registrasi Tamu - ${selectedEvent.nama_acara}`}
+        subtitle="Scan QR Code tamu untuk mencatat kehadiran"
+        actions={
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => router.push("/admin/scan-qr")}
+            icon={<ArrowLeft className="w-4 h-4" />}
+          >
+            Ganti Acara
+          </Button>
+        }
       />
 
       <div className="flex-1 p-4 sm:p-6 space-y-4 sm:space-y-8">
@@ -168,18 +242,21 @@ export default function ScanQRPage() {
               Riwayat Scan
             </h2>
           </div>
-          {scanned ? (
+          {scanHistory.length > 0 ? (
             <div className="space-y-2 sm:space-y-3">
-              <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-gray-50 border border-gray-100">
-                <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
-                  <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-green-600" />
+              {scanHistory.map((item) => (
+                <div key={item.id} className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-gray-50 border border-gray-100">
+                  <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
+                    <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-green-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-semibold text-foreground">{item.name}</p>
+                    <p className="text-[10px] sm:text-xs text-muted">{item.nim} · {item.prodi}</p>
+                    <p className="text-[10px] sm:text-xs text-muted/60">{item.event}</p>
+                  </div>
+                  <span className="text-[10px] sm:text-xs text-muted/60 shrink-0">{item.time}</span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm font-semibold text-foreground">{dummyGuest.name}</p>
-                  <p className="text-[10px] sm:text-xs text-muted">{dummyGuest.nim} · {dummyGuest.prodi}</p>
-                </div>
-                <span className="text-[10px] sm:text-xs text-muted/60 shrink-0">Baru saja</span>
-              </div>
+              ))}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-10 sm:py-16 px-4 sm:px-6 text-center">
@@ -187,7 +264,7 @@ export default function ScanQRPage() {
                 Belum ada riwayat scan
               </p>
               <p className="text-[10px] sm:text-xs text-gray-400 mt-1">
-                Riwayat akan muncul setelah fitur scanner diaktifkan
+                Riwayat akan muncul setelah tamu berhasil discan
               </p>
             </div>
           )}
@@ -205,5 +282,17 @@ export default function ScanQRPage() {
         </div>
       )}
     </>
+  );
+}
+
+export default function ScanQRPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex-1 flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <ScanQRContent />
+    </Suspense>
   );
 }
