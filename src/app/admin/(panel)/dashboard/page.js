@@ -1,16 +1,22 @@
+"use client";
+
 import Navbar from "@/components/Navbar";
 import StatCard from "@/components/StatCard";
 import EventCard from "@/components/EventCard";
-import { dummyEvents, dummyGuests } from "@/lib/dummy-data";
+import ActivityFeed from "@/components/ActivityFeed";
+import { useGuests } from "@/lib/GuestContext";
+import { useEvents } from "@/lib/EventContext";
 
 export default function DashboardPage() {
-  const totalEvents = dummyEvents.length;
-  const totalGuests = dummyGuests.length;
-  const todayGuests = dummyGuests.filter(
+  const { guests } = useGuests();
+  const { events } = useEvents();
+  const totalEvents = events.length;
+  const totalGuests = guests.length;
+  const todayGuests = guests.filter(
     (g) => g.waktu_kedatangan?.startsWith(new Date().toISOString().slice(0, 10))
   ).length;
-  const activeEvents = dummyEvents.filter((e) => e.status === "active").length;
-  const recentEvents = dummyEvents.slice(0, 4);
+  const activeEvents = events.filter((e) => e.status === "registrasi_dibuka").length;
+  const recentEvents = events.slice(0, 4);
 
   return (
     <>
@@ -21,7 +27,7 @@ export default function DashboardPage() {
 
       <div className="flex-1 p-6 space-y-8">
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="Total Acara"
             value={totalEvents}
@@ -78,10 +84,27 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {recentEvents.map((event) => (
               <EventCard key={event.id} event={event} />
             ))}
+          </div>
+        </div>
+
+        {/* Activity Log */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-base font-bold text-foreground">
+                Aktivitas Terbaru
+              </h2>
+              <p className="text-sm text-muted mt-0.5">
+                Riwayat aktivitas pengguna
+              </p>
+            </div>
+          </div>
+          <div className="glass-card rounded-2xl p-4 sm:p-6">
+            <ActivityFeed limit={10} />
           </div>
         </div>
 

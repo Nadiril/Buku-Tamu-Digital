@@ -3,11 +3,21 @@
 import { useState, use } from "react";
 import Input from "@/components/Input";
 import Button from "@/components/Button";
-import { dummyEvents } from "@/lib/dummy-data";
+import { useGuests } from "@/lib/GuestContext";
+import { useEvents } from "@/lib/EventContext";
+
+const generateToken = () => {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "qr-";
+  for (let i = 0; i < 16; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+  return result;
+};
 
 export default function GuestFormPage({ params }) {
   const { slug } = use(params);
-  const event = dummyEvents.find((e) => e.slug === slug);
+  const { events } = useEvents();
+  const event = events.find((e) => e.slug === slug);
+  const { addGuest } = useGuests();
 
   const [form, setForm] = useState({
     nama: "",
@@ -22,6 +32,20 @@ export default function GuestFormPage({ params }) {
     e.preventDefault();
     setLoading(true);
     setTimeout(() => {
+      const guest = {
+        id: Date.now(),
+        nama: form.nama,
+        instansi: form.instansi,
+        no_hp: form.no_hp,
+        tujuan: form.tujuan,
+        kategori_tamu: "reguler",
+        status_kehadiran: "hadir",
+        waktu_kedatangan: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        acara_id: event.id,
+        qr_token: generateToken(),
+      };
+      addGuest(guest);
       setLoading(false);
       setSubmitted(true);
     }, 1500);
@@ -30,7 +54,7 @@ export default function GuestFormPage({ params }) {
   if (!event) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center animate-fade-in">
+        <div className="text-center">
           <div className="w-20 h-20 rounded-2xl bg-danger-muted mx-auto flex items-center justify-center mb-5">
             <svg
               className="w-10 h-10 text-danger"
@@ -65,7 +89,7 @@ export default function GuestFormPage({ params }) {
           <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-success/5 rounded-full blur-3xl"></div>
         </div>
 
-        <div className="relative text-center animate-fade-in max-w-md mx-4">
+        <div className="relative text-center max-w-md mx-4">
           <div className="w-20 h-20 rounded-2xl bg-success-muted mx-auto flex items-center justify-center mb-5 glow-success">
             <svg
               className="w-10 h-10 text-success"
@@ -149,7 +173,7 @@ export default function GuestFormPage({ params }) {
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-accent/5 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="relative w-full max-w-lg mx-4 animate-fade-in">
+      <div className="relative w-full max-w-lg mx-4">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-accent mx-auto flex items-center justify-center shadow-lg shadow-accent/30 mb-4">

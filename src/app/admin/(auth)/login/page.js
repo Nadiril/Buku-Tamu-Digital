@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Input from "@/components/Input";
 import Button from "@/components/Button";
+import { useActivity } from "@/lib/ActivityContext";
 
 export default function AdminLoginPage() {
   const router = useRouter();
+  const { logActivity } = useActivity();
   const [form, setForm] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -19,6 +21,7 @@ export default function AdminLoginPage() {
 
     setTimeout(() => {
       if (form.username === "admin" && form.password === "admin") {
+        logActivity("login", `Login sebagai admin`);
         router.push("/admin/dashboard");
       } else {
         setError("Username atau password salah. Coba: admin / admin");
@@ -36,7 +39,7 @@ export default function AdminLoginPage() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-accent/4 rounded-full blur-[100px]" />
       </div>
 
-      <div className="relative w-full max-w-md mx-4 animate-fade-in">
+      <div className="relative w-full max-w-md mx-4">
         {/* Logo & Heading */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 rounded-2xl bg-white mx-auto flex items-center justify-center shadow-lg shadow-accent/20 mb-5 overflow-hidden">

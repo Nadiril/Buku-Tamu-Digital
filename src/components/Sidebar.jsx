@@ -53,13 +53,11 @@ const navItems = [
 
 
 export default function Sidebar() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Close sidebar on route change (mobile)
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
+
 
   // Close on outside click / resize to desktop
   useEffect(() => {
@@ -179,7 +177,7 @@ export default function Sidebar() {
             onClick={() => setMobileOpen(false)}
           />
           {/* Drawer */}
-          <div className="relative h-full animate-fade-in">
+          <div className="relative h-full">
             {sidebarContent}
           </div>
         </div>

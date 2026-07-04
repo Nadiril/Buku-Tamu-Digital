@@ -2,34 +2,59 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useGuests } from "@/lib/GuestContext";
+import { useState, useEffect, useRef } from "react";
 
-export default function EventCard({ event }) {
+export default function EventCard({ event, onEdit, onDelete, onStatusChange }) {
   const router = useRouter();
+  const { guests } = useGuests();
+  const totalTamu = guests.filter((g) => g.acara_id === event.id).length;
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const statusRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (statusRef.current && !statusRef.current.contains(e.target)) {
+        setShowStatusDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleRegistrasi = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (event.status !== "registrasi_dibuka") return;
     router.push(`/admin/scan-qr?eventId=${event.id}`);
   };
+
   const statusStyles = {
-    active: {
+    registrasi_dibuka: {
       badge: "bg-success-muted text-success border border-success/20",
-      dot: "bg-success pulse-dot",
-      label: "Aktif",
+      dot: "bg-success",
+      label: "Registrasi Dibuka",
     },
-    upcoming: {
-      badge: "bg-info-muted text-info border border-info/20",
-      dot: "bg-info",
+    akan_datang: {
+      badge: "bg-warning-muted text-warning border border-warning/20",
+      dot: "bg-warning",
       label: "Akan Datang",
     },
-    completed: {
-      badge: "bg-muted/20 text-muted border border-muted/20",
-      dot: "bg-muted",
-      label: "Selesai",
+    registrasi_ditutup: {
+      badge: "bg-danger-muted text-danger border border-danger/20",
+      dot: "bg-danger",
+      label: "Registrasi Ditutup",
     },
   };
 
-  const s = statusStyles[event.status] || statusStyles.upcoming;
+  const statusList = [
+    { value: "akan_datang", label: "Akan Datang" },
+    { value: "registrasi_dibuka", label: "Registrasi Dibuka" },
+    { value: "registrasi_ditutup", label: "Registrasi Ditutup" },
+  ];
+
+  const s = statusStyles[event.status] || statusStyles.akan_datang;
+  const isRegistrasiDisabled = event.status !== "registrasi_dibuka";
 
   const formatDate = (dateStr) => {
     return new Date(dateStr).toLocaleDateString("id-ID", {
@@ -114,7 +139,7 @@ export default function EventCard({ event }) {
               />
             </svg>
             <span className="font-medium text-foreground/80">
-              {event.total_tamu}
+              {totalTamu}
             </span>
             <span>Tamu</span>
           </div>
@@ -122,15 +147,82 @@ export default function EventCard({ event }) {
 
         {/* Footer actions */}
         <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between gap-2">
-          <span
-            onClick={handleRegistrasi}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-all duration-200 cursor-pointer"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Registrasi Tamu
-          </span>
+          <div className="flex items-center gap-1">
+            {(onEdit || onDelete) && (
+              <>
+                {onEdit && (
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(event); }}
+                    className="p-1.5 rounded-lg text-muted hover:text-accent hover:bg-accent/10 transition-all cursor-pointer"
+                    title="Edit acara"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(event.id); }}
+                    className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-danger/10 transition-all cursor-pointer"
+                    title="Hapus acara"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                )}
+                {onStatusChange && (
+                  <div className="relative" ref={statusRef}>
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowStatusDropdown((v) => !v); }}
+                      className="p-1.5 rounded-lg text-muted hover:text-accent hover:bg-accent/10 transition-all cursor-pointer"
+                      title="Ubah Status"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
+                    {showStatusDropdown && (
+                      <div className="absolute left-0 top-full mt-1 z-50 w-44 glass-card rounded-xl py-1 shadow-lg border border-border">
+                        {statusList.map((st) => (
+                          <button
+                            key={st.value}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onStatusChange(event, st.value);
+                              setShowStatusDropdown(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 text-xs font-medium transition-colors ${
+                              event.status === st.value
+                                ? "text-accent bg-accent/5"
+                                : "text-muted hover:text-foreground hover:bg-background"
+                            }`}
+                          >
+                            {st.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+            <span
+              onClick={handleRegistrasi}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
+                isRegistrasiDisabled
+                  ? "bg-muted/10 text-muted/50 cursor-not-allowed"
+                  : "bg-accent/10 text-accent hover:bg-accent/20 cursor-pointer"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Registrasi Tamu
+            </span>
+          </div>
           <span className="text-xs text-muted group-hover:text-accent transition-colors duration-200 flex items-center gap-1">
             Lihat Detail
             <svg

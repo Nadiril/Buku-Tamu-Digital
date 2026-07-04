@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Input from "./Input";
+import Button from "./Button";
 
 const kategoriMap = {
   reguler: { badge: "bg-info-muted text-info border border-info/20", label: "Reguler" },
@@ -15,9 +17,58 @@ const statusKehadiranMap = {
   tidak_hadir: { badge: "bg-danger-muted text-danger border border-danger/20", label: "Tidak Hadir" },
 };
 
-export default function GuestTable({ guests, showEvent = false, events = [] }) {
+export default function GuestTable({ guests, showEvent = false, events = [], onEdit, onDelete }) {
   const [search, setSearch] = useState("");
   const [kategoriFilter, setKategoriFilter] = useState("");
+  const [qrGuest, setQrGuest] = useState(null);
+  const [detailGuest, setDetailGuest] = useState(null);
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const menuRef = useRef(null);
+  const triggerRefs = useRef({});
+
+  useEffect(() => {
+    if (!openMenuId) return;
+    const onClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        const trigger = triggerRefs.current[openMenuId];
+        if (trigger && !trigger.contains(e.target)) {
+          setOpenMenuId(null);
+        }
+      }
+    };
+    const onScroll = () => setOpenMenuId(null);
+    document.addEventListener("mousedown", onClickOutside);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", onClickOutside);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [openMenuId]);
+
+  const toggleMenu = (guestId, e) => {
+    if (openMenuId === guestId) {
+      setOpenMenuId(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 192;
+    const menuHeight = 220;
+
+    let top = rect.bottom + 4;
+    let left = Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8);
+
+    if (top + menuHeight > window.innerHeight) {
+      top = rect.top - menuHeight - 4;
+    }
+
+    if (left < 8) left = 8;
+    if (top < 8) top = 8;
+
+    setMenuPos({ top, left });
+    triggerRefs.current[guestId] = e.currentTarget;
+    setOpenMenuId(guestId);
+  };
 
   const getEventName = (acara_id) => {
     const event = events.find((e) => e.id === acara_id);
@@ -48,7 +99,13 @@ export default function GuestTable({ guests, showEvent = false, events = [] }) {
     });
   };
 
-  const cols = showEvent ? 7 : 6;
+  const hasActions = !!(onEdit || onDelete);
+  const cols = (showEvent ? 7 : 6) + (hasActions ? 1 : 0);
+
+  const getQrUrl = (token) => {
+    if (typeof window === "undefined") return "";
+    return `${window.location.origin}/scan/${token}`;
+  };
 
   return (
     <div className="space-y-4">
@@ -122,8 +179,13 @@ export default function GuestTable({ guests, showEvent = false, events = [] }) {
                   Status Kehadiran
                 </th>
                 <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5 w-[15%]">
-                  Created
+                  Jam Hadir
                 </th>
+                {hasActions && (
+                  <th className="text-right text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5 w-[10%]">
+                    Aksi
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -193,7 +255,7 @@ export default function GuestTable({ guests, showEvent = false, events = [] }) {
                     </td>
                     {showEvent && (
                       <td className="px-5 py-3.5">
-                        <span className="text-xs bg-accent-muted text-accent px-2.5 py-1 rounded-full font-medium inline-block whitespace-nowrap max-w-[200px] truncate" title={getEventName(guest.acara_id)}>
+                        <span className="text-xs bg-accent-muted text-accent px-2.5 py-1 rounded-full font-medium inline-block truncate max-w-[180px]" title={getEventName(guest.acara_id)}>
                           {getEventName(guest.acara_id)}
                         </span>
                       </td>
@@ -211,15 +273,34 @@ export default function GuestTable({ guests, showEvent = false, events = [] }) {
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <div className="text-sm whitespace-nowrap">
-                        <p className="text-foreground/80 font-medium">
-                          {formatTime(guest.created_at)}
-                        </p>
-                        <p className="text-xs text-muted">
-                          {formatDate(guest.created_at)}
-                        </p>
-                      </div>
+                      {guest.status_kehadiran === "tidak_hadir" ? (
+                        <span className="text-sm text-muted">—</span>
+                      ) : guest.waktu_kedatangan ? (
+                        <div className="text-sm whitespace-nowrap">
+                          <p className="text-foreground/80 font-medium">
+                            {formatTime(guest.waktu_kedatangan)}
+                          </p>
+                          <p className="text-xs text-muted">
+                            {formatDate(guest.waktu_kedatangan)}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted">—</span>
+                      )}
                     </td>
+                    {hasActions && (
+                      <td className="pl-5 pr-6 py-3 text-right">
+                        <button
+                          onClick={(e) => toggleMenu(guest.id, e)}
+                          className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg text-muted hover:text-foreground hover:bg-input/50 transition-all cursor-pointer"
+                          title="Aksi"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01" />
+                          </svg>
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -227,6 +308,181 @@ export default function GuestTable({ guests, showEvent = false, events = [] }) {
           </table>
         </div>
       </div>
+
+      {/* Actions Dropdown Menu */}
+      {openMenuId && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: "fixed", top: menuPos.top, left: menuPos.left, zIndex: 60 }}
+          className="w-48 glass-card rounded-xl py-1.5 shadow-xl border border-border"
+        >
+          <button
+            onClick={() => {
+              const g = guests.find((g) => g.id === openMenuId);
+              if (g) setDetailGuest(g);
+              setOpenMenuId(null);
+            }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-input/50 transition-colors cursor-pointer"
+          >
+            <svg className="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Detail Tamu
+          </button>
+          {onEdit && (
+            <button
+              onClick={() => {
+                const g = guests.find((g) => g.id === openMenuId);
+                if (g) onEdit(g);
+                setOpenMenuId(null);
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-input/50 transition-colors cursor-pointer"
+            >
+              <svg className="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Edit Data
+            </button>
+          )}
+          <button
+            onClick={() => {
+              const g = guests.find((g) => g.id === openMenuId);
+              if (g) setQrGuest(g);
+              setOpenMenuId(null);
+            }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-input/50 transition-colors cursor-pointer"
+          >
+            <svg className="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+            </svg>
+            Lihat QR Code
+          </button>
+          <div className="border-t border-border my-1.5 mx-3" />
+          {onDelete && (
+            <button
+              onClick={() => {
+                onDelete(openMenuId);
+                setOpenMenuId(null);
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Hapus Data
+            </button>
+          )}
+        </div>,
+        document.body
+      )}
+
+      {/* Detail Guest Modal */}
+      {detailGuest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDetailGuest(null)}></div>
+          <div className="relative glass-card rounded-2xl p-6 sm:p-8 w-full max-w-md mx-4 glow-accent">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-foreground">Detail Tamu</h3>
+              <button onClick={() => setDetailGuest(null)} className="text-muted hover:text-foreground transition-colors p-1 cursor-pointer">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 pb-4 border-b border-border/50">
+                <div className="w-12 h-12 rounded-full bg-accent-muted text-accent flex items-center justify-center text-lg font-bold shrink-0">
+                  {detailGuest.nama.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">{detailGuest.nama}</p>
+                  <p className="text-sm text-muted">{detailGuest.instansi}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted text-xs mb-0.5">No. HP</p>
+                  <p className="text-foreground font-medium">{detailGuest.no_hp || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted text-xs mb-0.5">Kategori</p>
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full inline-block ${
+                    (kategoriMap[detailGuest.kategori_tamu] || kategoriMap.reguler).badge
+                  }`}>
+                    {(kategoriMap[detailGuest.kategori_tamu] || kategoriMap.reguler).label}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-muted text-xs mb-0.5">Acara</p>
+                  <p className="text-foreground font-medium">{getEventName(detailGuest.acara_id)}</p>
+                </div>
+                <div>
+                  <p className="text-muted text-xs mb-0.5">Status Kehadiran</p>
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full inline-block ${
+                    (statusKehadiranMap[detailGuest.status_kehadiran] || statusKehadiranMap.hadir).badge
+                  }`}>
+                    {(statusKehadiranMap[detailGuest.status_kehadiran] || statusKehadiranMap.hadir).label}
+                  </span>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-muted text-xs mb-0.5">QR Token</p>
+                  <p className="text-foreground font-mono text-xs break-all bg-input/50 rounded-lg px-3 py-2">{detailGuest.qr_token}</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end pt-4">
+              <Button type="button" onClick={() => setDetailGuest(null)}>Tutup</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Modal */}
+      {qrGuest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setQrGuest(null)}></div>
+          <div className="relative glass-card rounded-2xl p-6 sm:p-8 w-full max-w-sm mx-4 glow-accent text-center">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-foreground">QR Code Tamu</h3>
+              <button onClick={() => setQrGuest(null)} className="text-muted hover:text-foreground transition-colors p-1 cursor-pointer">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-sm font-medium text-foreground mb-1">{qrGuest.nama}</p>
+            <p className="text-xs text-muted mb-4">{getEventName(qrGuest.acara_id)}</p>
+            <div className="bg-white rounded-xl p-3 inline-block mx-auto">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(getQrUrl(qrGuest.qr_token))}`}
+                alt={`QR Code ${qrGuest.nama}`}
+                className="w-48 h-48 mx-auto"
+              />
+            </div>
+            <p className="text-xs text-muted mt-3 break-all">{getQrUrl(qrGuest.qr_token)}</p>
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="secondary"
+                className="flex-1"
+                onClick={() => {
+                  const a = document.createElement("a");
+                  a.href = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(getQrUrl(qrGuest.qr_token))}`;
+                  a.download = `qr-${qrGuest.nama.replace(/\s+/g, "-")}.png`;
+                  a.click();
+                }}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download
+              </Button>
+              <Button type="button" className="flex-1" onClick={() => setQrGuest(null)}>Tutup</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -6,12 +6,25 @@ import GuestTable from "@/components/GuestTable";
 import Button from "@/components/Button";
 import Input from "@/components/Input";
 import Toast from "@/components/Toast";
-import { dummyEvents, dummyGuests } from "@/lib/dummy-data";
+import { useGuests } from "@/lib/GuestContext";
+import { useEvents } from "@/lib/EventContext";
+import { useActivity } from "@/lib/ActivityContext";
+
+const generateToken = () => {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "qr-";
+  for (let i = 0; i < 16; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+  return result;
+};
 
 export default function GuestsPage() {
-  const [guests, setGuests] = useState(dummyGuests);
+  const { guests, addGuest, updateGuest, deleteGuest } = useGuests();
+  const { events } = useEvents();
+  const { logActivity } = useActivity();
   const [eventFilter, setEventFilter] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [editingGuest, setEditingGuest] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [toast, setToast] = useState(null);
   const [newGuest, setNewGuest] = useState({
@@ -19,6 +32,7 @@ export default function GuestsPage() {
     instansi: "",
     no_hp: "",
     kategori_tamu: "reguler",
+    acara_id: "",
   });
 
   // Import state
@@ -26,6 +40,7 @@ export default function GuestsPage() {
   const [importPreview, setImportPreview] = useState([]);
   const [importing, setImporting] = useState(false);
   const [importStep, setImportStep] = useState("upload"); // upload | preview
+  const [importEventId, setImportEventId] = useState("");
 
   const filteredGuests = eventFilter
     ? guests.filter((g) => g.acara_id === parseInt(eventFilter))
@@ -35,28 +50,90 @@ export default function GuestsPage() {
     setToast({ message, type, id: Date.now() });
   };
 
+  const handleEdit = (guest) => {
+    setNewGuest({
+      nama: guest.nama,
+      instansi: guest.instansi,
+      no_hp: guest.no_hp || "",
+      kategori_tamu: guest.kategori_tamu,
+      acara_id: guest.acara_id || "",
+    });
+    setEditingGuest(guest);
+    setShowModal(true);
+  };
+
+  const handleUpdateGuest = (e) => {
+    e.preventDefault();
+    const acaraId = eventFilter ? parseInt(eventFilter) : parseInt(newGuest.acara_id);
+    if (!acaraId) {
+      showToast("Pilih acara terlebih dahulu!", "error");
+      return;
+    }
+    updateGuest(editingGuest.id, {
+      nama: newGuest.nama,
+      instansi: newGuest.instansi,
+      no_hp: newGuest.no_hp,
+      kategori_tamu: newGuest.kategori_tamu,
+      acara_id: acaraId,
+    });
+    logActivity("update_guest", `Mengedit tamu "${newGuest.nama}"`);
+    setShowModal(false);
+    setEditingGuest(null);
+    setNewGuest({ nama: "", instansi: "", no_hp: "", kategori_tamu: "reguler", acara_id: "" });
+    showToast("Tamu berhasil diperbarui!");
+  };
+
+  const handleDelete = (id) => {
+    setConfirmDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    const deleted = guests.find((g) => g.id === confirmDeleteId);
+    deleteGuest(confirmDeleteId);
+    if (deleted) logActivity("delete_guest", `Menghapus tamu "${deleted.nama}"`);
+    setConfirmDeleteId(null);
+    showToast("Tamu berhasil dihapus!");
+  };
+
   const handleAddGuest = (e) => {
     e.preventDefault();
+    const acaraId = eventFilter ? parseInt(eventFilter) : parseInt(newGuest.acara_id);
+    if (!acaraId) {
+      showToast("Pilih acara terlebih dahulu!", "error");
+      return;
+    }
     const guest = {
       id: Date.now(),
       nama: newGuest.nama,
       instansi: newGuest.instansi,
       no_hp: newGuest.no_hp,
       kategori_tamu: newGuest.kategori_tamu,
-      status_kehadiran: "hadir",
+      status_kehadiran: "tidak_hadir",
+      waktu_kedatangan: null,
       created_at: new Date().toISOString(),
-      acara_id: 0,
+      acara_id: acaraId,
+      qr_token: generateToken(),
     };
-    setGuests([guest, ...guests]);
+    addGuest(guest);
+    logActivity("create_guest", `Menambah tamu "${guest.nama}"`);
     setShowModal(false);
-    setNewGuest({ nama: "", instansi: "", no_hp: "", kategori_tamu: "reguler" });
+    setNewGuest({ nama: "", instansi: "", no_hp: "", kategori_tamu: "reguler", acara_id: "" });
     showToast("Tamu berhasil ditambahkan!");
   };
 
   const parseCSV = (text) => {
     const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
     if (lines.length < 2) return [];
-    const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+    const rawHeaders = lines[0].split(",").map((h) => h.trim());
+    const lowerHeaders = rawHeaders.map((h) => h.toLowerCase().replace(/[\s.]+/g, "_").replace(/[^a-z0-9_]/g, ""));
+    const headers = lowerHeaders.map((h) => {
+      if (/^kategori/i.test(h) || (h === "status" && !lowerHeaders.some((x) => /^kategori/i.test(x)))) return "kategori_tamu";
+      if (/^(status_)?kehadiran/i.test(h)) return "status_kehadiran";
+      if (/^no_?hp|nohp|telepon|telp|phone/i.test(h)) return "no_hp";
+      if (/^(tanggal|waktu|created)/i.test(h)) return "created_at";
+      if (/acara|event/i.test(h)) return "acara_id";
+      return h;
+    });
     const results = [];
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(",").map((v) => v.trim());
@@ -91,25 +168,60 @@ export default function GuestsPage() {
     reader.readAsText(file);
   };
 
+  const normalize = (s) => s.trim().toLowerCase().replace(/\s+/g, " ");
+
+  const resolveAcaraId = (row) => {
+    const csvValue = row.acara_id;
+    if (csvValue) {
+      const matched = events.find(
+        (e) => normalize(e.nama_acara) === normalize(csvValue)
+      );
+      if (matched) return matched.id;
+      const parsed = parseInt(csvValue);
+      if (!isNaN(parsed)) return parsed;
+    }
+    if (importEventId) return parseInt(importEventId);
+    if (eventFilter) return parseInt(eventFilter);
+    return 0;
+  };
+
   const handleImport = () => {
+    const hasAcaraColumn = importPreview.some((row) => row.acara_id);
+    if (!eventFilter && !importEventId && !hasAcaraColumn) {
+      showToast("Pilih acara terlebih dahulu sebelum import!", "error");
+      return;
+    }
     setImporting(true);
     setTimeout(() => {
-      const newGuests = importPreview.map((row, idx) => ({
-        id: Date.now() + idx,
-        nama: row.nama || "",
-        instansi: row.instansi || "",
-        no_hp: row.no_hp || "",
-        kategori_tamu: (row.kategori_tamu || "reguler").toLowerCase(),
-        status_kehadiran: (row.status_kehadiran || "hadir").toLowerCase(),
-        created_at: row.created_at || new Date().toISOString(),
-        acara_id: parseInt(row.acara_id) || 0,
-      }));
-      setGuests([...newGuests, ...guests]);
+      const newGuests = importPreview.map((row, idx) => {
+        const acara_id = resolveAcaraId(row);
+        return {
+          id: Date.now() + idx,
+          nama: row.nama || "",
+          instansi: row.instansi || "",
+          no_hp: row.no_hp || "",
+          kategori_tamu: (row.kategori_tamu || "reguler").toLowerCase(),
+          status_kehadiran: "tidak_hadir",
+          waktu_kedatangan: null,
+          created_at: row.created_at || new Date().toISOString(),
+          acara_id,
+          qr_token: generateToken(),
+        };
+      });
+      const hasMissing = newGuests.some((g) => !g.acara_id);
+      if (hasMissing) {
+        setImporting(false);
+        showToast("Ada tamu yang tidak memiliki acara. Periksa kembali data CSV atau pilih acara!", "error");
+        return;
+      }
+      newGuests.forEach((g) => addGuest(g));
+      logActivity("import_guest", `Mengimpor ${newGuests.length} tamu dari CSV`);
       setImporting(false);
       setShowImportModal(false);
       setImportFile(null);
       setImportPreview([]);
       setImportStep("upload");
+      setImportEventId("");
       showToast(`${newGuests.length} tamu berhasil diimpor!`);
     }, 1000);
   };
@@ -118,6 +230,7 @@ export default function GuestsPage() {
     setImportFile(null);
     setImportPreview([]);
     setImportStep("upload");
+    setImportEventId("");
     setShowImportModal(false);
   };
 
@@ -159,7 +272,7 @@ export default function GuestsPage() {
               className="w-full rounded-xl bg-input border border-input-border pl-10 pr-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-input-focus transition-all duration-200 appearance-none cursor-pointer"
             >
               <option value="">Semua Acara</option>
-              {dummyEvents.map((event) => (
+              {events.map((event) => (
                 <option key={event.id} value={event.id}>
                   {event.nama_acara}
                 </option>
@@ -178,14 +291,14 @@ export default function GuestsPage() {
             </button>
           )}
         </div>
-        <GuestTable guests={filteredGuests} events={dummyEvents} showEvent />
+        <GuestTable guests={filteredGuests} events={events} showEvent onEdit={handleEdit} onDelete={handleDelete} />
       </div>
 
       {/* Import Modal */}
       {showImportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={resetImport}></div>
-          <div className="relative glass-card rounded-2xl p-6 sm:p-8 w-full max-w-2xl mx-4 glow-accent animate-fade-in max-h-[90vh] overflow-y-auto">
+          <div className="relative glass-card rounded-2xl p-6 sm:p-8 w-full max-w-2xl mx-4 glow-accent max-h-[90vh] overflow-y-auto">
             {importStep === "upload" && (
               <>
                 <div className="flex items-center justify-between mb-6">
@@ -232,6 +345,34 @@ export default function GuestsPage() {
                   </button>
                 </div>
 
+                {/* Event Selector (when no filter active) */}
+                {!eventFilter && (
+                  <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center mb-4 p-4 bg-muted/10 rounded-xl border border-border">
+                    <div className="flex-1 w-full">
+                      <label className="text-sm font-medium text-foreground/80 block mb-1.5">
+                        Acara Tujuan <span className="text-danger ml-1">*</span>
+                      </label>
+                      <select
+                        value={importEventId}
+                        onChange={(e) => setImportEventId(e.target.value)}
+                        className="w-full rounded-xl bg-input border border-input-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-input-focus transition-all duration-200"
+                      >
+                        <option value="">Pilih Acara</option>
+                        {events.map((event) => (
+                          <option key={event.id} value={event.id}>
+                            {event.nama_acara}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-muted mt-1">
+                        {importPreview.some((row) => row.acara_id)
+                          ? "Acara dari CSV akan dicocokkan otomatis. Pilih acara di atas sebagai fallback jika nama tidak dikenal."
+                          : "CSV tidak memiliki kolom Acara. Pilih acara untuk semua data yang diimport."}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Preview Table */}
                 <div className="overflow-x-auto rounded-xl border border-border">
                   <table className="w-full text-sm">
@@ -246,38 +387,59 @@ export default function GuestsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {importPreview.map((row, idx) => (
+                      {importPreview.map((row, idx) => {
+                        const resolvedEvent = events.find(
+                          (e) => normalize(e.nama_acara) === normalize(row.acara_id || "")
+                        );
+                        const resolvedName = resolvedEvent
+                          ? resolvedEvent.nama_acara
+                          : row.acara_id
+                            ? null
+                            : null;
+                        return (
                         <tr key={idx} className="border-b border-border/50 last:border-0">
                           <td className="px-4 py-3 text-sm font-medium text-foreground">{row.nama || "—"}</td>
                           <td className="px-4 py-3 text-sm text-muted">{row.instansi || "—"}</td>
                           <td className="px-4 py-3">
                             <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                              (row.kategori_tamu || "reguler") === "vip" ? "bg-warning-muted text-warning border border-warning/20" :
-                              (row.kategori_tamu || "reguler") === "vvip" ? "bg-danger-muted text-danger border border-danger/20" :
+                              (row.kategori_tamu || "reguler").toLowerCase() === "vip" ? "bg-warning-muted text-warning border border-warning/20" :
+                              (row.kategori_tamu || "reguler").toLowerCase() === "vvip" ? "bg-danger-muted text-danger border border-danger/20" :
                               "bg-info-muted text-info border border-info/20"
                             }`}>
-                              {(row.kategori_tamu || "reguler").charAt(0).toUpperCase() + (row.kategori_tamu || "reguler").slice(1)}
+                              {(row.kategori_tamu || "reguler").toLowerCase() === "vvip" ? "VVIP" : (row.kategori_tamu || "reguler").toLowerCase() === "vip" ? "VIP" : "Reguler"}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-muted font-mono">{row.no_hp || "—"}</td>
                           <td className="px-4 py-3">
                             <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                              (row.status_kehadiran || "hadir") === "terlambat" ? "bg-warning-muted text-warning border border-warning/20" :
-                              (row.status_kehadiran || "hadir") === "tidak_hadir" ? "bg-danger-muted text-danger border border-danger/20" :
+                              (row.status_kehadiran || "hadir").toLowerCase() === "terlambat" ? "bg-warning-muted text-warning border border-warning/20" :
+                              (row.status_kehadiran || "hadir").toLowerCase() === "tidak_hadir" ? "bg-danger-muted text-danger border border-danger/20" :
                               "bg-success-muted text-success border border-success/20"
                             }`}>
-                              {(row.status_kehadiran || "Hadir").charAt(0).toUpperCase() + (row.status_kehadiran || "hadir").slice(1)}
+                              {(row.status_kehadiran || "hadir").toLowerCase() === "tidak_hadir" ? "Tidak Hadir" : (row.status_kehadiran || "hadir").toLowerCase() === "terlambat" ? "Terlambat" : "Hadir"}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-sm text-muted">{row.acara_id || "—"}</td>
+                          <td className="px-4 py-3 text-sm">
+                            {resolvedName ? (
+                              <span className="text-xs bg-accent-muted text-accent px-2.5 py-1 rounded-full font-medium">
+                                {resolvedName}
+                              </span>
+                            ) : row.acara_id ? (
+                              <span className="text-xs bg-warning-muted text-warning px-2.5 py-1 rounded-full font-medium" title="Nama acara tidak dikenal di sistem">
+                                {row.acara_id}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted">—</span>
+                            )}
+                          </td>
                         </tr>
-                      ))}
+                      );})}
                     </tbody>
                   </table>
                 </div>
 
                 <div className="flex gap-3 pt-6">
-                  <Button type="button" variant="secondary" className="flex-1" onClick={() => setImportStep("upload")}>Kembali</Button>
+                  <Button type="button" variant="secondary" className="flex-1" onClick={() => { setImportStep("upload"); setImportEventId(""); }}>Kembali</Button>
                   <Button type="button" className="flex-1" onClick={handleImport} disabled={importing}>
                     {importing ? (
                       <span className="flex items-center gap-2">
@@ -303,23 +465,23 @@ export default function GuestsPage() {
         </div>
       )}
 
-      {/* Add Guest Modal */}
+      {/* Add / Edit Guest Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowModal(false)}></div>
-          <div className="relative glass-card rounded-2xl p-8 w-full max-w-lg mx-4 glow-accent animate-fade-in">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setShowModal(false); setEditingGuest(null); setNewGuest({ nama: "", instansi: "", no_hp: "", kategori_tamu: "reguler", acara_id: "" }); }}></div>
+          <div className="relative glass-card rounded-2xl p-8 w-full max-w-lg mx-4 glow-accent">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-lg font-bold text-foreground">Tambah Tamu Baru</h2>
-                <p className="text-sm text-muted mt-0.5">Isi data tamu di bawah ini</p>
+                <h2 className="text-lg font-bold text-foreground">{editingGuest ? "Edit Tamu" : "Tambah Tamu Baru"}</h2>
+                <p className="text-sm text-muted mt-0.5">{editingGuest ? "Perbarui data tamu di bawah ini" : "Isi data tamu di bawah ini"}</p>
               </div>
-              <button onClick={() => setShowModal(false)} className="text-muted hover:text-foreground transition-colors p-1 cursor-pointer">
+              <button onClick={() => { setShowModal(false); setEditingGuest(null); setNewGuest({ nama: "", instansi: "", no_hp: "", kategori_tamu: "reguler", acara_id: "" }); }} className="text-muted hover:text-foreground transition-colors p-1 cursor-pointer">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <form onSubmit={handleAddGuest} className="space-y-4">
+            <form onSubmit={editingGuest ? handleUpdateGuest : handleAddGuest} className="space-y-4">
               <Input
                 id="guest-name"
                 label="Nama Lengkap"
@@ -374,11 +536,51 @@ export default function GuestsPage() {
                   <option value="vvip">VVIP</option>
                 </select>
               </div>
+              {(!eventFilter || editingGuest) && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-foreground/80">
+                    Acara <span className="text-danger ml-1">*</span>
+                  </label>
+                  <select
+                    value={newGuest.acara_id}
+                    onChange={(e) => setNewGuest({ ...newGuest, acara_id: e.target.value })}
+                    className="w-full rounded-xl bg-input border border-input-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-input-focus transition-all duration-200"
+                    required
+                  >
+                    <option value="">Pilih Acara</option>
+                    {events.map((event) => (
+                      <option key={event.id} value={event.id}>
+                        {event.nama_acara}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="flex gap-3 pt-4">
-                <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowModal(false)}>Batal</Button>
-                <Button type="submit" className="flex-1">Simpan Tamu</Button>
+                <Button type="button" variant="secondary" className="flex-1" onClick={() => { setShowModal(false); setEditingGuest(null); setNewGuest({ nama: "", instansi: "", no_hp: "", kategori_tamu: "reguler", acara_id: "" }); }}>Batal</Button>
+                <Button type="submit" className="flex-1">{editingGuest ? "Simpan Perubahan" : "Simpan Tamu"}</Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmDeleteId(null)}></div>
+          <div className="relative glass-card rounded-2xl p-6 w-full max-w-sm mx-4 glow-danger text-center">
+            <div className="w-12 h-12 rounded-full bg-danger/10 text-danger flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-foreground mb-2">Hapus Tamu?</h3>
+            <p className="text-sm text-muted mb-6">Data tamu yang dihapus tidak dapat dikembalikan.</p>
+            <div className="flex gap-3">
+              <Button type="button" variant="secondary" className="flex-1" onClick={() => setConfirmDeleteId(null)}>Batal</Button>
+              <Button type="button" variant="danger" className="flex-1" onClick={confirmDelete}>Hapus</Button>
+            </div>
           </div>
         </div>
       )}

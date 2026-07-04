@@ -1,52 +1,124 @@
 "use client";
 
 import { useState } from "react";
+import * as XLSX from "xlsx";
 import Navbar from "@/components/Navbar";
 import Button from "@/components/Button";
-import { FileDown, FileSpreadsheet, Download, BarChart3, Users, CheckCircle, XCircle, TrendingUp } from "lucide-react";
+import { useGuests } from "@/lib/GuestContext";
+import { useEvents } from "@/lib/EventContext";
+import { useActivity } from "@/lib/ActivityContext";
+import { FileDown, FileSpreadsheet, Users, CheckCircle, XCircle, AlertTriangle, TrendingUp } from "lucide-react";
 
-const dummyStats = {
-  total: 0,
-  hadir: 0,
-  belumHadir: 0,
-  persentase: 0,
+const statusLabel = {
+  hadir: "Hadir",
+  terlambat: "Terlambat",
+  tidak_hadir: "Tidak Hadir",
 };
 
 export default function LaporanPage() {
   const [eventFilter, setEventFilter] = useState("");
+  const { guests } = useGuests();
+  const { events } = useEvents();
+  const { logActivity } = useActivity();
 
-  const stats = dummyStats;
+  const getEventName = (acara_id) => {
+    const event = events.find((e) => e.id === acara_id);
+    return event ? event.nama_acara : "—";
+  };
+
+  const filteredGuests = eventFilter
+    ? guests.filter((g) => g.acara_id === parseInt(eventFilter))
+    : guests;
+
+  const total = filteredGuests.length;
+  const hadir = filteredGuests.filter((g) => g.status_kehadiran === "hadir").length;
+  const terlambat = filteredGuests.filter((g) => g.status_kehadiran === "terlambat").length;
+  const belumHadir = filteredGuests.filter((g) => g.status_kehadiran === "tidak_hadir").length;
+  const persentase = total > 0 ? Math.round(((hadir + terlambat) / total) * 100) : 0;
 
   const statCards = [
     {
       title: "Total Tamu",
-      value: stats.total,
+      value: total,
       icon: Users,
       color: "text-accent",
       bg: "bg-accent/10",
     },
     {
       title: "Sudah Hadir",
-      value: stats.hadir,
+      value: hadir,
       icon: CheckCircle,
       color: "text-success",
       bg: "bg-success/10",
     },
     {
-      title: "Belum Hadir",
-      value: stats.belumHadir,
-      icon: XCircle,
+      title: "Terlambat",
+      value: terlambat,
+      icon: AlertTriangle,
       color: "text-warning",
       bg: "bg-warning/10",
     },
     {
+      title: "Tidak Hadir",
+      value: belumHadir,
+      icon: XCircle,
+      color: "text-danger",
+      bg: "bg-danger/10",
+    },
+    {
       title: "Kehadiran",
-      value: `${stats.persentase}%`,
+      value: `${persentase}%`,
       icon: TrendingUp,
       color: "text-info",
       bg: "bg-info/10",
     },
   ];
+
+  const exportData = filteredGuests.map((g) => ({
+    Nama: g.nama,
+    Instansi: g.instansi,
+    "No. HP": g.no_hp || "-",
+    Kategori: g.kategori_tamu.charAt(0).toUpperCase() + g.kategori_tamu.slice(1),
+    "Status Kehadiran": statusLabel[g.status_kehadiran] || g.status_kehadiran,
+    Acara: getEventName(g.acara_id),
+    "Waktu Daftar": new Date(g.created_at).toLocaleString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  }));
+
+  const handleExportCSV = () => {
+    if (exportData.length === 0) return;
+    logActivity("export_laporan", "Mengexport laporan CSV" + (eventFilter ? ` (filter acara)` : " (semua acara)"));
+    const headers = Object.keys(exportData[0]);
+    const csvRows = [
+      headers.join(","),
+      ...exportData.map((row) =>
+        headers.map((h) => `"${(row[h] || "").replace(/"/g, '""')}"`).join(",")
+      ),
+    ];
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `laporan-tamu${eventFilter ? `-${getEventName(parseInt(eventFilter)).replace(/\s+/g, "-")}` : ""}-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportExcel = () => {
+    if (exportData.length === 0) return;
+    logActivity("export_laporan", "Mengexport laporan Excel" + (eventFilter ? ` (filter acara)` : " (semua acara)"));
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Laporan Tamu");
+    XLSX.writeFile(wb, `laporan-tamu${eventFilter ? `-${getEventName(parseInt(eventFilter)).replace(/\s+/g, "-")}` : ""}-${new Date().toISOString().split("T")[0]}.xlsx`);
+  };
+
+  const maxChartVal = Math.max(hadir, terlambat, belumHadir, 1);
 
   return (
     <>
@@ -68,16 +140,19 @@ export default function LaporanPage() {
               className="w-full rounded-xl bg-input border border-input-border pl-10 pr-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-input-focus transition-all duration-200 appearance-none cursor-pointer"
             >
               <option value="">Semua Acara</option>
-              <option value="wisuda">Wisuda STIKOM PGRI Banyuwangi</option>
-             
+              {events.map((event) => (
+                <option key={event.id} value={event.id}>
+                  {event.nama_acara}
+                </option>
+              ))}
             </select>
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            <Button variant="secondary" className="flex-1 sm:flex-none">
+            <Button variant="secondary" className="flex-1 sm:flex-none" onClick={handleExportCSV} disabled={total === 0}>
               <FileDown className="w-4 h-4" />
-              Export PDF
+              Export CSV
             </Button>
-            <Button variant="success" className="flex-1 sm:flex-none">
+            <Button variant="success" className="flex-1 sm:flex-none" onClick={handleExportExcel} disabled={total === 0}>
               <FileSpreadsheet className="w-4 h-4" />
               Export Excel
             </Button>
@@ -85,7 +160,7 @@ export default function LaporanPage() {
         </div>
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {statCards.map((card) => (
             <div
               key={card.title}
@@ -97,47 +172,168 @@ export default function LaporanPage() {
                   <card.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${card.color}`} />
                 </div>
               </div>
-              <p className={`text-xl sm:text-2xl font-bold text-foreground ${stats.total === 0 ? "text-muted/40" : ""}`}>
+              <p className={`text-xl sm:text-2xl font-bold text-foreground ${total === 0 ? "text-muted/40" : ""}`}>
                 {card.value}
               </p>
             </div>
           ))}
         </div>
 
-        {/* Chart Placeholder */}
+        {/* Grafik Kehadiran */}
         <div className="glass-card rounded-2xl p-4 sm:p-6">
-          <div className="flex items-center gap-2 mb-4 sm:mb-6">
-            <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-muted" />
+          <div className="flex items-center gap-2 mb-6">
+            <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-muted" />
             <h3 className="text-sm sm:text-base font-bold text-foreground">Grafik Kehadiran</h3>
           </div>
-          <div className="flex flex-col items-center justify-center py-12 sm:py-20 text-center">
-            <svg className="w-24 h-24 sm:w-32 sm:h-32 text-muted/20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={0.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            <p className="text-sm font-semibold text-muted">Belum Ada Data</p>
-            <p className="text-xs text-muted/60 mt-1 max-w-xs">
-              Grafik kehadiran akan tampil setelah tamu mulai melakukan registrasi pada acara
-            </p>
-          </div>
+          {total === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center">
+              <svg className="w-24 h-24 sm:w-32 sm:h-32 text-muted/20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={0.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <p className="text-sm font-semibold text-muted">Belum Ada Data</p>
+              <p className="text-xs text-muted/60 mt-1 max-w-xs">
+                Grafik kehadiran akan tampil setelah terdapat tamu yang terdaftar
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-sm mb-1.5">
+                    <span className="font-medium text-foreground">Hadir</span>
+                    <span className="text-muted">{hadir} tamu</span>
+                  </div>
+                  <div className="w-full bg-muted/10 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="bg-success h-full rounded-full transition-all duration-500"
+                      style={{ width: `${(hadir / maxChartVal) * 100}%` }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1.5">
+                    <span className="font-medium text-foreground">Terlambat</span>
+                    <span className="text-muted">{terlambat} tamu</span>
+                  </div>
+                  <div className="w-full bg-muted/10 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="bg-warning h-full rounded-full transition-all duration-500"
+                      style={{ width: `${(terlambat / maxChartVal) * 100}%` }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1.5">
+                    <span className="font-medium text-foreground">Tidak Hadir</span>
+                    <span className="text-muted">{belumHadir} tamu</span>
+                  </div>
+                  <div className="w-full bg-muted/10 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="bg-danger h-full rounded-full transition-all duration-500"
+                      style={{ width: `${(belumHadir / maxChartVal) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-center gap-6 pt-2 text-xs text-muted">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm bg-success" />
+                  Hadir
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm bg-warning" />
+                  Terlambat
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm bg-danger" />
+                  Tidak Hadir
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Detail Table Placeholder */}
+        {/* Rekapitulasi Tamu */}
         <div className="glass-card rounded-2xl p-4 sm:p-6">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-muted" />
-              <h3 className="text-sm sm:text-base font-bold text-foreground">Rekapitulasi Tamu</h3>
+          <div className="flex items-center gap-2 mb-4 sm:mb-6">
+            <Users className="w-4 h-4 sm:w-5 sm:h-5 text-muted" />
+            <h3 className="text-sm sm:text-base font-bold text-foreground">Rekapitulasi Tamu</h3>
+            {eventFilter && (
+              <span className="text-xs bg-accent-muted text-accent px-2 py-0.5 rounded-full font-medium ml-auto">
+                {getEventName(parseInt(eventFilter))}
+              </span>
+            )}
+          </div>
+          {filteredGuests.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 sm:py-16 text-center">
+              <svg className="w-16 h-16 sm:w-20 sm:h-20 text-muted/20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={0.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p className="text-sm font-semibold text-muted">Belum Ada Data Tamu</p>
+              <p className="text-xs text-muted/60 mt-1 max-w-xs">
+                Data tamu akan muncul setelah filter acara dipilih dan terdapat tamu yang terdaftar
+              </p>
             </div>
-          </div>
-          <div className="flex flex-col items-center justify-center py-10 sm:py-16 text-center">
-            <svg className="w-16 h-16 sm:w-20 sm:h-20 text-muted/20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={0.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <p className="text-sm font-semibold text-muted">Belum Ada Data Tamu</p>
-            <p className="text-xs text-muted/60 mt-1 max-w-xs">
-              Data tamu akan muncul setelah filter acara dipilih dan terdapat tamu yang terdaftar
-            </p>
-          </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[600px]">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-4 py-3">Nama</th>
+                    <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-4 py-3">Instansi</th>
+                    <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-4 py-3">Kategori</th>
+                    <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-4 py-3">Status</th>
+                    {!eventFilter && (
+                      <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-4 py-3">Acara</th>
+                    )}
+                    <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-4 py-3">Waktu</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredGuests.map((guest) => (
+                    <tr key={guest.id} className="border-b border-border/50 last:border-0">
+                      <td className="px-4 py-3 font-medium text-foreground">{guest.nama}</td>
+                      <td className="px-4 py-3 text-muted">{guest.instansi}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                          guest.kategori_tamu === "vip" ? "bg-warning-muted text-warning border border-warning/20" :
+                          guest.kategori_tamu === "vvip" ? "bg-danger-muted text-danger border border-danger/20" :
+                          "bg-info-muted text-info border border-info/20"
+                        }`}>
+                          {guest.kategori_tamu === "vvip" ? "VVIP" : guest.kategori_tamu === "vip" ? "VIP" : "Reguler"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                          guest.status_kehadiran === "terlambat" ? "bg-warning-muted text-warning border border-warning/20" :
+                          guest.status_kehadiran === "tidak_hadir" ? "bg-danger-muted text-danger border border-danger/20" :
+                          "bg-success-muted text-success border border-success/20"
+                        }`}>
+                          {statusLabel[guest.status_kehadiran]}
+                        </span>
+                      </td>
+                      {!eventFilter && (
+                        <td className="px-4 py-3">
+                          <span className="text-xs bg-accent-muted text-accent px-2.5 py-1 rounded-full font-medium">
+                            {getEventName(guest.acara_id)}
+                          </span>
+                        </td>
+                      )}
+                      <td className="px-4 py-3 text-muted whitespace-nowrap">
+                        <span className="text-xs">
+                          {new Date(guest.created_at).toLocaleDateString("id-ID", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </>
