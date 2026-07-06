@@ -8,7 +8,6 @@ export const dummyEvents = [
     tanggal_selesai: "2026-08-15",
     jam_mulai: "09:00",
     status: "registrasi_dibuka",
-    total_tamu: 4,
     created_at: "2026-07-03",
   },
   {
@@ -20,7 +19,6 @@ export const dummyEvents = [
     tanggal_selesai: "2026-09-01",
     jam_mulai: "13:00",
     status: "akan_datang",
-    total_tamu: 0,
     created_at: "2026-07-04",
   },
   {
@@ -32,7 +30,6 @@ export const dummyEvents = [
     tanggal_selesai: "2026-07-02",
     jam_mulai: "09:00",
     status: "registrasi_ditutup",
-    total_tamu: 0,
     created_at: "2026-06-20",
   },
 ];

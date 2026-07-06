@@ -38,18 +38,15 @@ export default function ScanPage({ params }) {
     setConfirming(true);
     try {
       const res = await fetch(`/api/public/scan/${token}`, { method: "POST" });
-      if (res.ok) {
-        const data = await res.json();
+      const data = await res.json();
+      if (data.success) {
         setGuest((prev) => ({ ...prev, status_kehadiran: data.status, waktu_kedatangan: new Date().toISOString() }));
         setConfirmed(true);
+      } else if (res.status === 409 || data.code === "already_registered") {
+        setGuest((prev) => ({ ...prev, status_kehadiran: data.guest?.status_kehadiran || "hadir" }));
+        setConfirmed(true);
       } else {
-        const err = await res.json();
-        if (res.status === 409) {
-          setGuest((prev) => ({ ...prev, status_kehadiran: err.guest?.status_kehadiran || "hadir" }));
-          setConfirmed(true);
-        } else {
-          setError(err.error || "Gagal mengkonfirmasi kehadiran");
-        }
+        setError(data.error || data.message || "Gagal mengkonfirmasi kehadiran");
       }
     } catch {
       setError("Gagal terhubung ke server");

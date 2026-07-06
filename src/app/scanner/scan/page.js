@@ -42,8 +42,8 @@ function ScannerScanContent() {
 
     try {
       const res = await fetch(`/api/scan/${scannedGuest.qr_token}?acara_id=${eventId}`, { method: "POST" });
-      if (res.ok) {
-        const data = await res.json();
+      const data = await res.json();
+      if (data.success) {
         updateGuest(scannedGuest.id, {
           status_kehadiran: data.status,
           waktu_kedatangan: new Date().toISOString(),
@@ -57,9 +57,8 @@ function ScannerScanContent() {
         );
         setTimeout(resetScan, 2000);
       } else {
-        const err = await res.json();
         setScannedGuest(null);
-        showToast(err.error || "Gagal mencatat kehadiran", "error");
+        showToast(data.error || data.message || "Gagal mencatat kehadiran", "error");
       }
     } catch {
       showToast("Gagal terhubung ke server", "error");
