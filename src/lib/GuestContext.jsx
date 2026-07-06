@@ -1,9 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
-import { dummyGuests, dummyEvents } from "./dummy-data";
-
-const STORAGE_KEY = "buku-tamu-guests";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 
 const GuestContext = createContext(null);
 
@@ -11,36 +8,67 @@ export function GuestProvider({ children }) {
   const [guests, setGuests] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        setGuests(JSON.parse(stored));
-      } catch {
-        setGuests([...dummyGuests]);
+  const fetchGuests = useCallback(async () => {
+    try {
+      const res = await fetch("/api/guests");
+      if (res.ok) {
+        const data = await res.json();
+        setGuests(data);
       }
-    } else {
-      setGuests([...dummyGuests]);
+    } catch {
+      // ignore
+    } finally {
+      setLoaded(true);
     }
-    setLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (loaded) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(guests));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
+    fetchGuests();
+    const interval = setInterval(fetchGuests, 30000);
+    const onFocus = () => fetchGuests();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchGuests]);
+
+  const addGuest = async (guest) => {
+    const res = await fetch("/api/guests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(guest),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setGuests((prev) => [data, ...prev]);
+      return data;
     }
-  }, [guests, loaded]);
-
-  const addGuest = (guest) => {
-    setGuests((prev) => [guest, ...prev]);
+    return null;
   };
 
-  const updateGuest = (id, updates) => {
-    setGuests((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
+  const updateGuest = async (id, updates) => {
+    const res = await fetch(`/api/guests/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setGuests((prev) => prev.map((g) => (g.id === id ? { ...g, ...data } : g)));
+      return data;
+    }
+    return null;
   };
 
-  const deleteGuest = (id) => {
-    setGuests((prev) => prev.filter((g) => g.id !== id));
+  const deleteGuest = async (id) => {
+    const res = await fetch(`/api/guests/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setGuests((prev) => prev.filter((g) => g.id !== id));
+      return true;
+    }
+    return false;
   };
 
   const getGuestByToken = (token) => {
@@ -53,7 +81,7 @@ export function GuestProvider({ children }) {
   };
 
   return (
-    <GuestContext.Provider value={{ guests, loaded, addGuest, updateGuest, deleteGuest, getGuestByToken, getGuestsByEvent, setGuests }}>
+    <GuestContext.Provider value={{ guests, loaded, addGuest, updateGuest, deleteGuest, getGuestByToken, getGuestsByEvent, setGuests, fetchGuests }}>
       {children}
     </GuestContext.Provider>
   );

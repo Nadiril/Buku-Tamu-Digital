@@ -1,28 +1,72 @@
 "use client";
 
-import { use, useState } from "react";
-import { useGuests } from "@/lib/GuestContext";
-import { useEvents } from "@/lib/EventContext";
+import { use, useState, useEffect } from "react";
 import Button from "@/components/Button";
 
 export default function ScanPage({ params }) {
   const { token } = use(params);
-  const { guests, updateGuest } = useGuests();
-  const { events } = useEvents();
   const [confirmed, setConfirmed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [guest, setGuest] = useState(null);
+  const [event, setEvent] = useState(null);
+  const [error, setError] = useState("");
+  const [confirming, setConfirming] = useState(false);
 
-  const guest = guests.find((g) => g.qr_token === token);
-  const event = guest ? events.find((e) => e.id === guest.acara_id) : null;
+  useEffect(() => {
+    async function fetchGuest() {
+      try {
+        const res = await fetch(`/api/public/scan/${token}`);
+        if (res.ok) {
+          const data = await res.json();
+          setGuest(data.guest);
+          setEvent(data.guest.events);
+        } else if (res.status === 404) {
+          setError("QR Code tidak dikenali");
+        } else {
+          setError("Gagal memuat data");
+        }
+      } catch {
+        setError("Gagal terhubung ke server");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchGuest();
+  }, [token]);
 
-  const handleConfirm = () => {
-    updateGuest(guest.id, {
-      status_kehadiran: "hadir",
-      waktu_kedatangan: new Date().toISOString(),
-    });
-    setConfirmed(true);
+  const handleConfirm = async () => {
+    setConfirming(true);
+    try {
+      const res = await fetch(`/api/public/scan/${token}`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setGuest((prev) => ({ ...prev, status_kehadiran: data.status, waktu_kedatangan: new Date().toISOString() }));
+        setConfirmed(true);
+      } else {
+        const err = await res.json();
+        if (res.status === 409) {
+          setGuest((prev) => ({ ...prev, status_kehadiran: err.guest?.status_kehadiran || "hadir" }));
+          setConfirmed(true);
+        } else {
+          setError(err.error || "Gagal mengkonfirmasi kehadiran");
+        }
+      }
+    } catch {
+      setError("Gagal terhubung ke server");
+    } finally {
+      setConfirming(false);
+    }
   };
 
-  if (!guest) {
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error && !guest) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="text-center max-w-sm">
@@ -38,12 +82,24 @@ export default function ScanPage({ params }) {
     );
   }
 
+  const statusLabel = {
+    hadir: "Tepat Waktu",
+    terlambat: "Terlambat",
+    tidak_hadir: "Tidak Hadir",
+  };
+
+  const statusColor = {
+    hadir: "bg-success-muted text-success border-success/20",
+    terlambat: "bg-warning-muted text-warning border-warning/20",
+    tidak_hadir: "bg-danger-muted text-danger border-danger/20",
+  };
+
   if (confirmed) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden p-4">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-success/5 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-success/5 rounded-full blur-3xl"></div>
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-success/5 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-success/5 rounded-full blur-3xl" />
         </div>
         <div className="relative text-center max-w-sm">
           <div className="w-20 h-20 rounded-2xl bg-success-muted mx-auto flex items-center justify-center mb-5 glow-success">
@@ -59,6 +115,12 @@ export default function ScanPage({ params }) {
             <div className="flex justify-between text-sm">
               <span className="text-muted">Instansi</span>
               <span className="text-foreground font-medium">{guest.instansi}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted">Status</span>
+              <span className={`text-xs font-semibold px-2 py-1 rounded-full border ${statusColor[guest.status_kehadiran] || statusColor.hadir}`}>
+                {statusLabel[guest.status_kehadiran] || "Hadir"}
+              </span>
             </div>
             <div className="flex justify-between text-sm border-t border-border/50 pt-3">
               <span className="text-muted">Waktu Hadir</span>
@@ -76,8 +138,8 @@ export default function ScanPage({ params }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden p-4">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-accent/5 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-accent/5 rounded-full blur-3xl"></div>
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
       </div>
       <div className="relative text-center max-w-sm">
         <div className="w-20 h-20 rounded-2xl bg-accent mx-auto flex items-center justify-center shadow-lg shadow-accent/30 mb-5">
@@ -103,28 +165,36 @@ export default function ScanPage({ params }) {
           </div>
           <div className="flex justify-between text-sm border-t border-border/50 pt-3">
             <span className="text-muted">Status</span>
-            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-              guest.status_kehadiran === "hadir" ? "bg-success-muted text-success border border-success/20" :
-              "bg-warning-muted text-warning border border-warning/20"
-            }`}>
-              {guest.status_kehadiran === "hadir" ? "Sudah Hadir" : "Belum Hadir"}
+            <span className={`text-xs font-semibold px-2 py-1 rounded-full border ${statusColor[guest.status_kehadiran] || "bg-warning-muted text-warning border-warning/20"}`}>
+              {guest.status_kehadiran === "hadir" ? "Sudah Hadir" : guest.status_kehadiran === "terlambat" ? "Terlambat" : "Belum Hadir"}
             </span>
           </div>
         </div>
 
-        {guest.status_kehadiran === "hadir" ? (
+        {error && (
+          <div className="bg-danger-muted border border-danger/20 rounded-xl px-4 py-3 text-sm text-danger mb-4">{error}</div>
+        )}
+
+        {guest.status_kehadiran === "hadir" || guest.status_kehadiran === "terlambat" ? (
           <div className="flex items-center gap-2 justify-center text-success text-sm mb-4">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Anda sudah terdaftar hadir
+            {guest.status_kehadiran === "terlambat" ? "Anda sudah tercatat" : "Anda sudah terdaftar hadir"}
           </div>
         ) : (
-          <Button className="w-full" size="lg" onClick={handleConfirm}>
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            Konfirmasi Kehadiran
+          <Button className="w-full" size="lg" onClick={handleConfirm} disabled={confirming}>
+            {confirming ? (
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Memproses...
+              </span>
+            ) : (
+              <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> Konfirmasi Kehadiran</>
+            )}
           </Button>
         )}
       </div>

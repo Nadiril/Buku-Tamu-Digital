@@ -9,16 +9,10 @@ import Toast from "@/components/Toast";
 import { useGuests } from "@/lib/GuestContext";
 import { useEvents } from "@/lib/EventContext";
 import { useActivity } from "@/lib/ActivityContext";
-
-const generateToken = () => {
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "qr-";
-  for (let i = 0; i < 16; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
-  return result;
-};
+import { generateToken } from "@/lib/token";
 
 export default function GuestsPage() {
-  const { guests, addGuest, updateGuest, deleteGuest } = useGuests();
+  const { guests, addGuest, updateGuest, deleteGuest, fetchGuests } = useGuests();
   const { events } = useEvents();
   const { logActivity } = useActivity();
   const [eventFilter, setEventFilter] = useState("");
@@ -103,7 +97,6 @@ export default function GuestsPage() {
       return;
     }
     const guest = {
-      id: Date.now(),
       nama: newGuest.nama,
       instansi: newGuest.instansi,
       no_hp: newGuest.no_hp,
@@ -122,9 +115,47 @@ export default function GuestsPage() {
   };
 
   const parseCSV = (text) => {
-    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-    if (lines.length < 2) return [];
-    const rawHeaders = lines[0].split(",").map((h) => h.trim());
+    const rows = [];
+    let row = [];
+    let field = "";
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      const next = text[i + 1];
+      if (inQuotes) {
+        if (c === '"') {
+          if (next === '"') {
+            field += '"';
+            i++;
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          field += c;
+        }
+      } else if (c === '"') {
+        inQuotes = true;
+      } else if (c === ",") {
+        row.push(field);
+        field = "";
+      } else if (c === "\n") {
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = "";
+      } else if (c === "\r") {
+        // ignore carriage returns
+      } else {
+        field += c;
+      }
+    }
+    if (field !== "" || row.length > 0) {
+      row.push(field);
+      rows.push(row);
+    }
+    if (rows.length < 2) return [];
+
+    const rawHeaders = rows[0].map((h) => h.trim());
     const lowerHeaders = rawHeaders.map((h) => h.toLowerCase().replace(/[\s.]+/g, "_").replace(/[^a-z0-9_]/g, ""));
     const headers = lowerHeaders.map((h) => {
       if (/^kategori/i.test(h) || (h === "status" && !lowerHeaders.some((x) => /^kategori/i.test(x)))) return "kategori_tamu";
@@ -135,13 +166,14 @@ export default function GuestsPage() {
       return h;
     });
     const results = [];
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(",").map((v) => v.trim());
-      const row = {};
+    for (let i = 1; i < rows.length; i++) {
+      const values = rows[i].map((v) => v.trim());
+      if (values.every((v) => v === "")) continue;
+      const rowObj = {};
       headers.forEach((h, idx) => {
-        row[h] = values[idx] || "";
+        rowObj[h] = values[idx] || "";
       });
-      if (row.nama) results.push(row);
+      if (rowObj.nama) results.push(rowObj);
     }
     return results;
   };
@@ -178,52 +210,59 @@ export default function GuestsPage() {
       );
       if (matched) return matched.id;
       const parsed = parseInt(csvValue);
-      if (!isNaN(parsed)) return parsed;
+      if (!isNaN(parsed) && events.some((e) => e.id === parsed)) return parsed;
     }
-    if (importEventId) return parseInt(importEventId);
-    if (eventFilter) return parseInt(eventFilter);
+    if (importEventId && events.some((e) => e.id === parseInt(importEventId))) return parseInt(importEventId);
+    if (eventFilter && events.some((e) => e.id === parseInt(eventFilter))) return parseInt(eventFilter);
     return 0;
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     const hasAcaraColumn = importPreview.some((row) => row.acara_id);
     if (!eventFilter && !importEventId && !hasAcaraColumn) {
       showToast("Pilih acara terlebih dahulu sebelum import!", "error");
       return;
     }
     setImporting(true);
-    setTimeout(() => {
-      const newGuests = importPreview.map((row, idx) => {
-        const acara_id = resolveAcaraId(row);
-        return {
-          id: Date.now() + idx,
-          nama: row.nama || "",
-          instansi: row.instansi || "",
-          no_hp: row.no_hp || "",
-          kategori_tamu: (row.kategori_tamu || "reguler").toLowerCase(),
-          status_kehadiran: "tidak_hadir",
-          waktu_kedatangan: null,
-          created_at: row.created_at || new Date().toISOString(),
-          acara_id,
-          qr_token: generateToken(),
-        };
-      });
-      const hasMissing = newGuests.some((g) => !g.acara_id);
+    try {
+      const payload = importPreview.map((row) => ({
+        nama: row.nama || "",
+        instansi: row.instansi || "",
+        no_hp: row.no_hp || null,
+        tujuan: row.tujuan || null,
+        kategori_tamu: (row.kategori_tamu || "reguler").toLowerCase(),
+        acara_id: resolveAcaraId(row),
+      }));
+      const hasMissing = payload.some((g) => !g.acara_id);
       if (hasMissing) {
-        setImporting(false);
-        showToast("Ada tamu yang tidak memiliki acara. Periksa kembali data CSV atau pilih acara!", "error");
+        showToast("Ada tamu yang tidak memiliki acara valid. Periksa kembali data CSV atau pilih acara!", "error");
         return;
       }
-      newGuests.forEach((g) => addGuest(g));
-      logActivity("import_guest", `Mengimpor ${newGuests.length} tamu dari CSV`);
-      setImporting(false);
+
+      const res = await fetch("/api/guests/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guests: payload }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || "Gagal mengimpor data", "error");
+        return;
+      }
+
+      await fetchGuests();
+      logActivity("import_guest", `Mengimpor ${data.count} tamu dari CSV`);
       setShowImportModal(false);
       setImportFile(null);
       setImportPreview([]);
       setImportStep("upload");
       setImportEventId("");
-      showToast(`${newGuests.length} tamu berhasil diimpor!`);
-    }, 1000);
+      showToast(`${data.count} tamu berhasil diimpor!`);
+    } catch {
+      showToast("Gagal terhubung ke server", "error");
+    } finally {
+      setImporting(false);
+    }
   };
 
   const resetImport = () => {

@@ -36,24 +36,40 @@ function ScannerScanContent() {
     setScanKey((k) => k + 1);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!scannedGuest) return;
     setSubmitting(true);
-    setTimeout(() => {
-      updateGuest(scannedGuest.id, {
-        status_kehadiran: "hadir",
-        waktu_kedatangan: new Date().toISOString(),
-      });
+
+    try {
+      const res = await fetch(`/api/scan/${scannedGuest.qr_token}?acara_id=${eventId}`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        updateGuest(scannedGuest.id, {
+          status_kehadiran: data.status,
+          waktu_kedatangan: new Date().toISOString(),
+        });
+        setScannedGuest((prev) => ({ ...prev, status_kehadiran: data.status }));
+        setSubmitted(true);
+        logActivity("scan_guest", `Scan kehadiran "${scannedGuest.nama}" di "${selectedEvent?.nama_acara}"`);
+        showToast(
+          data.status === "hadir" ? "Kehadiran tepat waktu!" :
+          "Tamu tercatat terlambat."
+        );
+        setTimeout(resetScan, 2000);
+      } else {
+        const err = await res.json();
+        setScannedGuest(null);
+        showToast(err.error || "Gagal mencatat kehadiran", "error");
+      }
+    } catch {
+      showToast("Gagal terhubung ke server", "error");
+    } finally {
       setSubmitting(false);
-      setSubmitted(true);
-      logActivity("scan_guest", `Scan kehadiran "${scannedGuest.nama}" di "${selectedEvent?.nama_acara}"`);
-      showToast("Kehadiran tamu berhasil dicatat!");
-      setTimeout(resetScan, 2000);
-    }, 800);
+    }
   };
 
   const handleScanError = (err) => {
-    const msg = err?.message || String(err) || "Gagal mengakses kamera atau memindai QR Code";
+    const msg = err?.message || "Gagal mengakses kamera atau memindai QR Code";
     showToast(msg, "error");
   };
 
@@ -66,14 +82,15 @@ function ScannerScanContent() {
     const match = String(raw).match(/\/scan\/([a-zA-Z0-9-]+)/);
     if (match) token = match[1];
     if (token) {
-      const guest = guests.find((g) => g.qr_token === token);
+      const eventGuests = guests.filter((g) => g.acara_id === parseInt(eventId));
+      const guest = eventGuests.find((g) => g.qr_token === token);
       if (guest) {
         setScannedGuest(guest);
         setSubmitted(false);
         return;
       }
     }
-    showToast("QR Code tidak dikenali atau tamu tidak ditemukan", "error");
+    showToast("QR Code tidak dikenali atau tamu tidak ditemukan di acara ini", "error");
   };
 
   if (!selectedEvent) {
@@ -122,12 +139,7 @@ function ScannerScanContent() {
             <h1 className="text-lg sm:text-xl font-bold text-foreground">{selectedEvent.nama_acara}</h1>
             <p className="text-xs sm:text-sm text-muted mt-0.5">Scan QR Code tamu untuk mencatat kehadiran</p>
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => router.push("/scanner/events")}
-            icon={<ArrowLeft className="w-4 h-4" />}
-          >
+          <Button variant="secondary" size="sm" onClick={() => router.push("/scanner/events")} icon={<ArrowLeft className="w-4 h-4" />}>
             Ganti Acara
           </Button>
         </div>
@@ -192,14 +204,17 @@ function ScannerScanContent() {
                     <div>
                       <p className="text-[10px] sm:text-xs text-muted">Status</p>
                       <span className={`text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full inline-block mt-0.5 ${
-                        scannedGuest.status_kehadiran === "hadir" ? "bg-success-muted text-success border border-success/20" : "bg-warning-muted text-warning border border-warning/20"
+                        scannedGuest.status_kehadiran === "hadir" ? "bg-success-muted text-success border border-success/20" :
+                        scannedGuest.status_kehadiran === "terlambat" ? "bg-warning-muted text-warning border border-warning/20" :
+                        "bg-warning-muted text-warning border border-warning/20"
                       }`}>
-                        {scannedGuest.status_kehadiran === "hadir" ? "Sudah Hadir" : "Belum Hadir"}
+                        {scannedGuest.status_kehadiran === "hadir" ? "Sudah Hadir" :
+                         scannedGuest.status_kehadiran === "terlambat" ? "Terlambat" : "Belum Hadir"}
                       </span>
                     </div>
                   </div>
                 </div>
-                {scannedGuest.status_kehadiran !== "hadir" && !submitted && (
+                {scannedGuest.status_kehadiran !== "hadir" && scannedGuest.status_kehadiran !== "terlambat" && !submitted && (
                   <Button onClick={handleSubmit} disabled={submitting} className="w-full">
                     {submitting ? (
                       <span className="flex items-center gap-2">
@@ -210,10 +225,7 @@ function ScannerScanContent() {
                         Mengirim...
                       </span>
                     ) : (
-                      <>
-                        <Send className="w-4 h-4" />
-                        Konfirmasi Kehadiran
-                      </>
+                      <><Send className="w-4 h-4" /> Konfirmasi Kehadiran</>
                     )}
                   </Button>
                 )}

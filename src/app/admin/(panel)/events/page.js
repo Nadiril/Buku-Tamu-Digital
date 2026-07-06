@@ -9,6 +9,16 @@ import Toast from "@/components/Toast";
 import { useEvents } from "@/lib/EventContext";
 import { useActivity } from "@/lib/ActivityContext";
 
+const defaultForm = {
+  nama_acara: "",
+  lokasi: "",
+  tanggal_mulai: "",
+  tanggal_selesai: "",
+  jam_mulai: "",
+  jam_selesai: "",
+  grace_period_minutes: "30",
+};
+
 export default function EventsPage() {
   const { events, addEvent, updateEvent, deleteEvent } = useEvents();
   const { logActivity } = useActivity();
@@ -16,9 +26,8 @@ export default function EventsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [newEvent, setNewEvent] = useState({ nama_acara: "", lokasi: "", tanggal_mulai: "", tanggal_selesai: "", jam_mulai: "" });
+  const [newEvent, setNewEvent] = useState({ ...defaultForm });
   const [toast, setToast] = useState(null);
-  const [statusChangeEvent, setStatusChangeEvent] = useState(null);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type, id: Date.now() });
@@ -29,27 +38,24 @@ export default function EventsPage() {
   );
 
   const resetForm = () => {
-    setNewEvent({ nama_acara: "", lokasi: "", tanggal_mulai: "", tanggal_selesai: "", jam_mulai: "" });
+    setNewEvent({ ...defaultForm });
     setEditingEvent(null);
     setShowModal(false);
   };
 
-  const handleCreateEvent = (e) => {
+  const handleCreateEvent = async (e) => {
     e.preventDefault();
-    const slug = newEvent.nama_acara.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
     const event = {
-      id: Date.now(),
       nama_acara: newEvent.nama_acara,
-      slug,
       lokasi: newEvent.lokasi,
       tanggal_mulai: newEvent.tanggal_mulai,
       tanggal_selesai: newEvent.tanggal_selesai,
       jam_mulai: newEvent.jam_mulai,
+      jam_selesai: newEvent.jam_selesai || "17:00",
+      grace_period_minutes: parseInt(newEvent.grace_period_minutes) || 30,
       status: "akan_datang",
-      total_tamu: 0,
-      created_at: new Date().toISOString().split("T")[0],
     };
-    addEvent(event);
+    await addEvent(event);
     logActivity("create_event", `Membuat acara "${event.nama_acara}"`);
     resetForm();
     showToast("Acara berhasil dibuat!");
@@ -62,19 +68,23 @@ export default function EventsPage() {
       tanggal_mulai: event.tanggal_mulai,
       tanggal_selesai: event.tanggal_selesai,
       jam_mulai: event.jam_mulai,
+      jam_selesai: event.jam_selesai || "17:00",
+      grace_period_minutes: String(event.grace_period_minutes || 30),
     });
     setEditingEvent(event);
     setShowModal(true);
   };
 
-  const handleUpdateEvent = (e) => {
+  const handleUpdateEvent = async (e) => {
     e.preventDefault();
-    updateEvent(editingEvent.id, {
+    await updateEvent(editingEvent.id, {
       nama_acara: newEvent.nama_acara,
       lokasi: newEvent.lokasi,
       tanggal_mulai: newEvent.tanggal_mulai,
       tanggal_selesai: newEvent.tanggal_selesai,
       jam_mulai: newEvent.jam_mulai,
+      jam_selesai: newEvent.jam_selesai || "17:00",
+      grace_period_minutes: parseInt(newEvent.grace_period_minutes) || 30,
     });
     logActivity("update_event", `Mengedit acara "${newEvent.nama_acara}"`);
     resetForm();
@@ -85,21 +95,21 @@ export default function EventsPage() {
     setConfirmDeleteId(id);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     const deleted = events.find((e) => e.id === confirmDeleteId);
-    deleteEvent(confirmDeleteId);
+    await deleteEvent(confirmDeleteId);
     if (deleted) logActivity("delete_event", `Menghapus acara "${deleted.nama_acara}"`);
     setConfirmDeleteId(null);
     showToast("Acara berhasil dihapus!");
   };
 
-  const handleStatusChange = (event, newStatus) => {
+  const handleStatusChange = async (event, newStatus) => {
     const statusLabels = {
       akan_datang: "Akan Datang",
       registrasi_dibuka: "Registrasi Dibuka",
       registrasi_ditutup: "Registrasi Ditutup",
     };
-    updateEvent(event.id, { status: newStatus });
+    await updateEvent(event.id, { status: newStatus });
     logActivity("update_status", `Mengubah status "${event.nama_acara}" menjadi "${statusLabels[newStatus]}"`);
     showToast("Status acara berhasil diperbarui!");
   };
@@ -132,7 +142,7 @@ export default function EventsPage() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={resetForm}></div>
-          <div className="relative glass-card rounded-2xl p-8 w-full max-w-lg mx-4 glow-accent">
+          <div className="relative glass-card rounded-2xl p-8 w-full max-w-lg mx-4 glow-accent max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-lg font-bold text-foreground">{editingEvent ? "Edit Acara" : "Buat Acara Baru"}</h2>
@@ -145,11 +155,15 @@ export default function EventsPage() {
             <form onSubmit={editingEvent ? handleUpdateEvent : handleCreateEvent} className="space-y-4">
               <Input id="event-name" label="Nama Acara" placeholder="Contoh: Seminar AI 2026" value={newEvent.nama_acara} onChange={(e) => setNewEvent({ ...newEvent, nama_acara: e.target.value })} required />
               <Input id="event-location" label="Lokasi" placeholder="Contoh: Aula Kampus Utama" value={newEvent.lokasi} onChange={(e) => setNewEvent({ ...newEvent, lokasi: e.target.value })} required />
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <Input id="event-start" label="Tanggal Mulai" type="date" value={newEvent.tanggal_mulai} onChange={(e) => setNewEvent({ ...newEvent, tanggal_mulai: e.target.value })} required />
                 <Input id="event-end" label="Tanggal Selesai" type="date" value={newEvent.tanggal_selesai} onChange={(e) => setNewEvent({ ...newEvent, tanggal_selesai: e.target.value })} required />
-                <Input id="event-time" label="Jam Mulai" type="time" value={newEvent.jam_mulai} onChange={(e) => setNewEvent({ ...newEvent, jam_mulai: e.target.value })} required />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Input id="event-start-time" label="Jam Mulai" type="time" value={newEvent.jam_mulai} onChange={(e) => setNewEvent({ ...newEvent, jam_mulai: e.target.value })} required />
+                <Input id="event-end-time" label="Jam Selesai" type="time" value={newEvent.jam_selesai} onChange={(e) => setNewEvent({ ...newEvent, jam_selesai: e.target.value })} required />
+              </div>
+              <Input id="event-grace" label="Batas Toleransi (menit)" type="number" placeholder="30" value={newEvent.grace_period_minutes} onChange={(e) => setNewEvent({ ...newEvent, grace_period_minutes: e.target.value })} />
               <div className="flex gap-3 pt-4">
                 <Button type="button" variant="secondary" className="flex-1" onClick={resetForm}>Batal</Button>
                 <Button type="submit" className="flex-1">{editingEvent ? "Simpan Perubahan" : "Simpan Acara"}</Button>
@@ -182,12 +196,7 @@ export default function EventsPage() {
       {/* Toast Notification */}
       {toast && (
         <div className="fixed bottom-6 right-6 z-[60]">
-          <Toast
-            key={toast.id}
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToast(null)}
-          />
+          <Toast key={toast.id} message={toast.message} type={toast.type} onClose={() => setToast(null)} />
         </div>
       )}
     </>

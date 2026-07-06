@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const icons = {
   success: (
@@ -47,6 +47,11 @@ export default function Toast({ message, type = "success", duration = 3000, onCl
   const [visible, setVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
 
+  const handleClose = useCallback(() => {
+    setLeaving(true);
+    setTimeout(() => onClose(), 300);
+  }, [onClose]);
+
   useEffect(() => {
     // Trigger enter animation
     const enterTimer = setTimeout(() => setVisible(true), 10);
@@ -58,12 +63,7 @@ export default function Toast({ message, type = "success", duration = 3000, onCl
       clearTimeout(enterTimer);
       clearTimeout(dismissTimer);
     };
-  }, [duration]);
-
-  const handleClose = () => {
-    setLeaving(true);
-    setTimeout(() => onClose(), 300);
-  };
+  }, [duration, handleClose]);
 
   return (
     <div

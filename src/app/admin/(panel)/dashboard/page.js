@@ -7,14 +7,25 @@ import ActivityFeed from "@/components/ActivityFeed";
 import { useGuests } from "@/lib/GuestContext";
 import { useEvents } from "@/lib/EventContext";
 
+function getWibDayBounds(date = new Date()) {
+  const wibDateStr = new Date(date.getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+  const start = new Date(wibDateStr + "T00:00:00+07:00");
+  const end = new Date(start.getTime() + 24 * 3600 * 1000);
+  return [start, end];
+}
+
 export default function DashboardPage() {
   const { guests } = useGuests();
   const { events } = useEvents();
   const totalEvents = events.length;
   const totalGuests = guests.length;
-  const todayGuests = guests.filter(
-    (g) => g.waktu_kedatangan?.startsWith(new Date().toISOString().slice(0, 10))
-  ).length;
+
+  const [dayStart, dayEnd] = getWibDayBounds();
+  const todayGuests = guests.filter((g) => {
+    if (!g.waktu_kedatangan) return false;
+    const t = new Date(g.waktu_kedatangan).getTime();
+    return t >= dayStart.getTime() && t < dayEnd.getTime();
+  }).length;
   const activeEvents = events.filter((e) => e.status === "registrasi_dibuka").length;
   const recentEvents = events.slice(0, 4);
 

@@ -1,112 +1,107 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Input from "@/components/Input";
 import Button from "@/components/Button";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
-
-const dummyAccounts = [
-  { email: "admin@kampus.ac.id", password: "admin123", role: "admin" },
-  { email: "scanner@kampus.ac.id", password: "scanner123", role: "scanner" },
-];
+import { createClient } from "@/lib/supabase/client";
 
 export default function HomePage() {
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [checkingSession, setCheckingSession] = useState(true);
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .single()
+          .then(({ data: profile }) => {
+            if (profile?.role === "admin") router.push("/admin/dashboard");
+            else if (profile?.role === "staff") router.push("/staff/dashboard");
+            else router.push("/scanner/events");
+          });
+      } else {
+        setCheckingSession(false);
+      }
+    });
+  }, [router, supabase]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    setTimeout(() => {
-      const account = dummyAccounts.find(
-        (a) => a.email === form.email && a.password === form.password
-      );
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
+      email: form.email,
+      password: form.password,
+    });
 
-      if (account) {
-        if (account.role === "admin") {
-          router.push("/admin/dashboard");
-        } else {
-          router.push("/scanner/events");
-        }
-      } else {
-        setError("Email atau password salah. Silakan coba lagi.");
-        setLoading(false);
-      }
-    }, 800);
+    if (authError || !data.user) {
+      setError("Email atau password salah. Silakan coba lagi.");
+      setLoading(false);
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .single();
+
+    if (profile?.role === "admin") {
+      router.push("/admin/dashboard");
+    } else if (profile?.role === "staff") {
+      router.push("/staff/dashboard");
+    } else {
+      router.push("/scanner/events");
+    }
   };
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
-      {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-accent/5 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-info/5 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-accent/3 rounded-full blur-[100px]"></div>
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-info/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-accent/3 rounded-full blur-[100px]" />
       </div>
 
       <div className="relative w-full max-w-md mx-4">
-        {/* Logo & Heading */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 rounded-2xl bg-white mx-auto flex items-center justify-center shadow-lg shadow-accent/20 mb-5 overflow-hidden">
-            <Image
-              src="/Logo.webp"
-              alt="Logo STIKOM PGRI Banyuwangi"
-              width={80}
-              height={80}
-              className="object-contain w-full h-full"
-              priority
-              unoptimized
-            />
+            <Image src="/Logo.webp" alt="Logo STIKOM PGRI Banyuwangi" width={80} height={80} className="object-contain w-full h-full" priority unoptimized />
           </div>
           <h1 className="text-2xl font-bold text-foreground leading-snug">
             Buku Tamu <span className="text-black">Digital</span>
           </h1>
-          <p className="text-sm font-semibold text-muted mt-1">
-            STIKOM PGRI Banyuwangi
-          </p>
-          <p className="text-xs text-muted/60 mt-1.5">
-            Masuk untuk mengelola acara atau registrasi tamu
-          </p>
+          <p className="text-sm font-semibold text-muted mt-1">STIKOM PGRI Banyuwangi</p>
+          <p className="text-xs text-muted/60 mt-1.5">Masuk untuk mengelola acara atau registrasi tamu</p>
         </div>
 
-        {/* Login Card */}
         <div className="glass-card rounded-2xl p-8 glow-accent">
           <form onSubmit={handleSubmit} className="space-y-5">
-            <Input
-              id="email"
-              label="Email"
-              type="email"
-              placeholder="Masukkan email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              required
-              icon={<Mail className="w-4 h-4" />}
-            />
+            <Input id="email" label="Email" type="email" placeholder="Masukkan email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required icon={<Mail className="w-4 h-4" />} />
 
             <div className="relative">
-              <Input
-                id="password"
-                label="Password"
-                type={showPassword ? "text" : "password"}
-                placeholder="Masukkan password"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                required
-                icon={<Lock className="w-4 h-4" />}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-[38px] text-muted hover:text-foreground transition-colors cursor-pointer"
-                tabIndex={-1}
-              >
+              <Input id="password" label="Password" type={showPassword ? "text" : "password"} placeholder="Masukkan password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required icon={<Lock className="w-4 h-4" />} />
+              <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-3 top-[38px] text-muted hover:text-foreground transition-colors cursor-pointer" tabIndex={-1}>
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
@@ -134,24 +129,8 @@ export default function HomePage() {
               )}
             </Button>
           </form>
-
-          <div className="mt-6 pt-5 border-t border-border space-y-2">
-            <p className="text-center text-xs text-muted">
-              Demo:{" "}
-              <code className="text-accent font-mono bg-accent-muted px-1.5 py-0.5 rounded">admin@kampus.ac.id</code>
-              {" / "}
-              <code className="text-accent font-mono bg-accent-muted px-1.5 py-0.5 rounded">admin123</code>
-            </p>
-            <p className="text-center text-xs text-muted">
-              Scanner:{" "}
-              <code className="text-accent font-mono bg-accent-muted px-1.5 py-0.5 rounded">scanner@kampus.ac.id</code>
-              {" / "}
-              <code className="text-accent font-mono bg-accent-muted px-1.5 py-0.5 rounded">scanner123</code>
-            </p>
-          </div>
         </div>
 
-        {/* Version */}
         <p className="text-center text-[11px] text-muted/40 mt-6">v1.0.0 — Buku Tamu Digital Multi Event</p>
       </div>
     </div>

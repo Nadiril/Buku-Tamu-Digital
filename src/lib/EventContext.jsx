@@ -1,9 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
-import { dummyEvents } from "./dummy-data";
-
-const STORAGE_KEY = "buku-tamu-events";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 
 const EventContext = createContext(null);
 
@@ -11,36 +8,67 @@ export function EventProvider({ children }) {
   const [events, setEvents] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        setEvents(JSON.parse(stored));
-      } catch {
-        setEvents([...dummyEvents]);
+  const fetchEvents = useCallback(async () => {
+    try {
+      const res = await fetch("/api/events");
+      if (res.ok) {
+        const data = await res.json();
+        setEvents(data);
       }
-    } else {
-      setEvents([...dummyEvents]);
+    } catch {
+      // ignore
+    } finally {
+      setLoaded(true);
     }
-    setLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (loaded) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
+    fetchEvents();
+    const interval = setInterval(fetchEvents, 30000);
+    const onFocus = () => fetchEvents();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchEvents]);
+
+  const addEvent = async (event) => {
+    const res = await fetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(event),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setEvents((prev) => [data, ...prev]);
+      return data;
     }
-  }, [events, loaded]);
-
-  const addEvent = (event) => {
-    setEvents((prev) => [event, ...prev]);
+    return null;
   };
 
-  const updateEvent = (id, updates) => {
-    setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...updates } : e)));
+  const updateEvent = async (id, updates) => {
+    const res = await fetch(`/api/events/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...data } : e)));
+      return data;
+    }
+    return null;
   };
 
-  const deleteEvent = (id) => {
-    setEvents((prev) => prev.filter((e) => e.id !== id));
+  const deleteEvent = async (id) => {
+    const res = await fetch(`/api/events/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setEvents((prev) => prev.filter((e) => e.id !== id));
+      return true;
+    }
+    return false;
   };
 
   const getEventById = (id) => {
@@ -52,7 +80,7 @@ export function EventProvider({ children }) {
   };
 
   return (
-    <EventContext.Provider value={{ events, loaded, addEvent, updateEvent, deleteEvent, getEventById, getEventBySlug, setEvents }}>
+    <EventContext.Provider value={{ events, loaded, addEvent, updateEvent, deleteEvent, getEventById, getEventBySlug, setEvents, fetchEvents }}>
       {children}
     </EventContext.Provider>
   );

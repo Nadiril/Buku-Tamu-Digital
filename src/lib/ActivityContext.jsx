@@ -1,8 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
-
-const STORAGE_KEY = "buku-tamu-activities";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 
 const ActivityContext = createContext(null);
 
@@ -10,25 +8,36 @@ export function ActivityProvider({ children }) {
   const [activities, setActivities] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        setActivities(JSON.parse(stored));
-      } catch {
-        setActivities([]);
+  const fetchActivities = useCallback(async () => {
+    try {
+      const res = await fetch("/api/activities");
+      if (res.ok) {
+        const data = await res.json();
+        setActivities(data);
       }
+    } catch {
+      // ignore
+    } finally {
+      setLoaded(true);
     }
-    setLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (loaded) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(activities));
-    }
-  }, [activities, loaded]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
+    fetchActivities();
+  }, [fetchActivities]);
 
-  const logActivity = (action, detail, meta = {}) => {
+  const logActivity = async (action, detail, meta = {}) => {
+    try {
+      await fetch("/api/activities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, detail, ...meta }),
+      });
+    } catch {
+      // ignore
+    }
+    // Optimistic update
     const activity = {
       id: Date.now(),
       action,

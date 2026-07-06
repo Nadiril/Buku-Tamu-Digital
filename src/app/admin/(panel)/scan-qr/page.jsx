@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useState, useRef } from "react";
 import Navbar from "@/components/Navbar";
 import QRScanner from "@/components/scanner/QRScanner";
 import Button from "@/components/Button";
@@ -26,9 +26,11 @@ function ScanQRContent() {
   const [scanKey, setScanKey] = useState(0);
   const [toast, setToast] = useState(null);
   const [scanHistory, setScanHistory] = useState([]);
+  const toastSeq = useRef(0);
 
   const showToast = (message, type = "success") => {
-    setToast({ message, type, id: Date.now() });
+    toastSeq.current += 1;
+    setToast({ message, type, id: toastSeq.current });
   };
 
   const resetScan = () => {
@@ -38,37 +40,45 @@ function ScanQRContent() {
     setScanKey((k) => k + 1);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!scannedGuest) return;
     setSubmitting(true);
-    setTimeout(() => {
-      updateGuest(scannedGuest.id, {
-        status_kehadiran: "hadir",
-        waktu_kedatangan: new Date().toISOString(),
-      });
+
+    try {
+      const res = await fetch(`/api/scan/${scannedGuest.qr_token}?acara_id=${eventId}`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        updateGuest(scannedGuest.id, {
+          status_kehadiran: data.status,
+          waktu_kedatangan: new Date().toISOString(),
+        });
+        setScannedGuest((prev) => ({ ...prev, status_kehadiran: data.status }));
+        setSubmitted(true);
+        setScanHistory((prev) => [
+          { id: Date.now(), nama: scannedGuest.nama, instansi: scannedGuest.instansi, no_hp: scannedGuest.no_hp, kategori_tamu: scannedGuest.kategori_tamu, event: selectedEvent?.nama_acara || allEvents.find((e) => e.id === scannedGuest.acara_id)?.nama_acara, status: data.status, time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) },
+          ...prev,
+        ]);
+        logActivity("scan_guest", `Scan kehadiran "${scannedGuest.nama}"` + (selectedEvent ? ` di "${selectedEvent.nama_acara}"` : ""));
+        showToast(
+          data.status === "hadir" ? "Kehadiran tepat waktu!" :
+          data.status === "terlambat" ? "Tamu tercatat terlambat." :
+          "Kehadiran tercatat."
+        );
+        setTimeout(resetScan, 2000);
+      } else {
+        const err = await res.json();
+        showToast(err.error || "Gagal mencatat kehadiran", "error");
+      }
+    } catch {
+      showToast("Gagal terhubung ke server", "error");
+    } finally {
       setSubmitting(false);
-      setSubmitted(true);
-      setScanHistory((prev) => [
-        {
-          id: Date.now(),
-          nama: scannedGuest.nama,
-          instansi: scannedGuest.instansi,
-          no_hp: scannedGuest.no_hp,
-          kategori_tamu: scannedGuest.kategori_tamu,
-          event: selectedEvent?.nama_acara || allEvents.find((e) => e.id === scannedGuest.acara_id)?.nama_acara,
-          time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
-        },
-        ...prev,
-      ]);
-      logActivity("scan_guest", `Scan kehadiran "${scannedGuest.nama}"` + (selectedEvent ? ` di "${selectedEvent.nama_acara}"` : ""));
-      showToast("Kehadiran tamu berhasil dicatat!");
-      setTimeout(resetScan, 2000);
-    }, 800);
+    }
   };
 
   const handleScanError = (err) => {
     console.error("QR Scan error:", err);
-    const msg = err?.message || String(err) || "Gagal mengakses kamera atau memindai QR Code";
+    const msg = err?.message || "Gagal mengakses kamera atau memindai QR Code";
     showToast(msg, "error");
   };
 
@@ -81,14 +91,15 @@ function ScanQRContent() {
     const match = String(raw).match(/\/scan\/([a-zA-Z0-9-]+)/);
     if (match) token = match[1];
     if (token) {
-      const guest = guests.find((g) => g.qr_token === token);
+      const eventGuests = guests.filter((g) => g.acara_id === parseInt(eventId));
+      const guest = eventGuests.find((g) => g.qr_token === token);
       if (guest) {
         setScannedGuest(guest);
         setSubmitted(false);
         return;
       }
     }
-    showToast("QR Code tidak dikenali atau tamu tidak ditemukan", "error");
+    showToast("QR Code tidak dikenali atau tamu tidak ditemukan di acara ini", "error");
   };
 
   const statusStyles = {
@@ -100,10 +111,7 @@ function ScanQRContent() {
   if (!selectedEvent) {
     return (
       <>
-        <Navbar
-          title="Registrasi Tamu"
-          subtitle="Pilih acara untuk memulai registrasi tamu"
-        />
+        <Navbar title="Registrasi Tamu" subtitle="Pilih acara untuk memulai registrasi tamu" />
         <div className="flex-1 p-6 space-y-6">
           {allEvents.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
@@ -111,9 +119,7 @@ function ScanQRContent() {
                 <QrCode className="w-8 h-8 text-accent/60" />
               </div>
               <h3 className="text-base font-semibold text-foreground mb-1">Belum Ada Acara</h3>
-              <p className="text-sm text-muted mb-6 max-w-xs">
-                Silakan buat acara terlebih dahulu sebelum melakukan registrasi tamu.
-              </p>
+              <p className="text-sm text-muted mb-6 max-w-xs">Silakan buat acara terlebih dahulu sebelum melakukan registrasi tamu.</p>
               <Button onClick={() => router.push("/admin/events")}>
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                 Buat Acara
@@ -125,19 +131,8 @@ function ScanQRContent() {
                 const s = statusStyles[event.status] || statusStyles.akan_datang;
                 const canScan = event.status === "registrasi_dibuka";
                 return (
-                  <button
-                    key={event.id}
-                    onClick={() => {
-                      if (!canScan) {
-                        showToast("Registrasi belum dibuka untuk acara ini", "warning");
-                        return;
-                      }
-                      router.push(`/admin/scan-qr?eventId=${event.id}`);
-                    }}
-                    className={`glass-card rounded-2xl p-5 transition-all duration-300 text-left w-full group ${
-                      canScan ? "hover:border-border-hover hover:bg-card-hover cursor-pointer" : "opacity-60 cursor-not-allowed"
-                    }`}
-                  >
+                  <button key={event.id} onClick={() => { if (!canScan) { showToast("Registrasi belum dibuka untuk acara ini", "warning"); return; } router.push(`/admin/scan-qr?eventId=${event.id}`); }}
+                    className={`glass-card rounded-2xl p-5 transition-all duration-300 text-left w-full group ${canScan ? "hover:border-border-hover hover:bg-card-hover cursor-pointer" : "opacity-60 cursor-not-allowed"}`}>
                     <div className="flex items-start justify-between mb-3">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${canScan ? "bg-accent/10" : "bg-muted/10"}`}>
                         <QrCode className={`w-5 h-5 ${canScan ? "text-accent" : "text-muted/50"}`} />
@@ -147,9 +142,7 @@ function ScanQRContent() {
                         {s.label || event.status}
                       </span>
                     </div>
-                    <h3 className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
-                      {event.nama_acara}
-                    </h3>
+                    <h3 className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">{event.nama_acara}</h3>
                     <p className="text-xs text-muted mt-1">{event.lokasi}</p>
                   </button>
                 );
@@ -163,19 +156,8 @@ function ScanQRContent() {
 
   return (
     <>
-      <Navbar
-        title={`Registrasi Tamu - ${selectedEvent.nama_acara}`}
-        subtitle="Scan QR Code tamu untuk mencatat kehadiran"
-        actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => router.push("/admin/scan-qr")}
-            icon={<ArrowLeft className="w-4 h-4" />}
-          >
-            Ganti Acara
-          </Button>
-        }
+      <Navbar title={`Registrasi Tamu - ${selectedEvent.nama_acara}`} subtitle="Scan QR Code tamu untuk mencatat kehadiran"
+        actions={<Button variant="secondary" size="sm" onClick={() => router.push("/admin/scan-qr")} icon={<ArrowLeft className="w-4 h-4" />}>Ganti Acara</Button>}
       />
 
       {selectedEvent.status !== "registrasi_dibuka" && (
@@ -186,19 +168,16 @@ function ScanQRContent() {
           <div>
             <p className="text-sm font-semibold text-warning">Registrasi Belum Tersedia</p>
             <p className="text-xs text-warning/70 mt-0.5">
-              {selectedEvent.status === "akan_datang"
-                ? "Acara ini masih dalam status Akan Datang. Tunggu hingga Admin membuka registrasi."
-                : "Registrasi untuk acara ini sudah ditutup. Scan QR tidak dapat dilakukan."}
+              {selectedEvent.status === "akan_datang" ? "Acara ini masih dalam status Akan Datang. Tunggu hingga Admin membuka registrasi." : "Registrasi untuk acara ini sudah ditutup. Scan QR tidak dapat dilakukan."}
             </p>
           </div>
         </div>
       )}
+
       <div className="flex-1 p-4 sm:p-6 space-y-4 sm:space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-stretch">
           <div className="glass-card rounded-2xl p-4 sm:p-6 flex flex-col">
-            <h2 className="text-sm sm:text-base font-bold text-foreground mb-3 sm:mb-4">
-              Scanner QR-Code
-            </h2>
+            <h2 className="text-sm sm:text-base font-bold text-foreground mb-3 sm:mb-4">Scanner QR-Code</h2>
             <div className="flex-1 flex items-center justify-center">
               {selectedEvent.status === "registrasi_dibuka" ? (
                 <QRScanner key={scanKey} onScan={handleScan} onError={handleScanError} />
@@ -211,9 +190,7 @@ function ScanQRContent() {
                   </div>
                   <p className="text-sm font-semibold text-muted mb-1">Scanner Terkunci</p>
                   <p className="text-xs text-muted/60 max-w-[200px]">
-                    {selectedEvent.status === "akan_datang"
-                      ? "Registrasi belum dibuka. Silakan tunggu hingga Admin mengubah status acara."
-                      : "Registrasi sudah ditutup. Tidak dapat melakukan scan QR."}
+                    {selectedEvent.status === "akan_datang" ? "Registrasi belum dibuka. Silakan tunggu hingga Admin mengubah status acara." : "Registrasi sudah ditutup. Tidak dapat melakukan scan QR."}
                   </p>
                 </div>
               )}
@@ -221,18 +198,12 @@ function ScanQRContent() {
           </div>
 
           <div className="glass-card rounded-2xl p-4 sm:p-6 flex flex-col">
-            <h2 className="text-sm sm:text-base font-bold text-foreground mb-3 sm:mb-4">
-              Detail Tamu
-            </h2>
+            <h2 className="text-sm sm:text-base font-bold text-foreground mb-3 sm:mb-4">Detail Tamu</h2>
             {scannedGuest ? (
               <div className="space-y-3 sm:space-y-4 flex-1">
                 <div className={`flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl ${submitted ? "bg-success-muted border border-success/20" : "bg-accent-muted border border-accent/20"}`}>
                   <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full ${submitted ? "bg-success/10" : "bg-accent/10"} flex items-center justify-center shrink-0`}>
-                    {submitted ? (
-                      <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-success" />
-                    ) : (
-                      <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
-                    )}
+                    <CheckCircle className={`w-4 h-4 sm:w-5 sm:h-5 ${submitted ? "text-success" : "text-accent"}`} />
                   </div>
                   <div>
                     <p className={`text-xs sm:text-sm font-semibold ${submitted ? "text-success" : "text-accent"}`}>
@@ -245,100 +216,53 @@ function ScanQRContent() {
                 </div>
                 <div className="p-3 sm:p-4 rounded-xl bg-input/50 border border-border space-y-2 sm:space-y-3">
                   <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                      <User className="w-3 h-3 sm:w-4 sm:h-4 text-accent" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] sm:text-xs text-muted">Nama</p>
-                      <p className="text-xs sm:text-sm font-semibold text-foreground">{scannedGuest.nama}</p>
-                    </div>
+                    <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0"><User className="w-3 h-3 sm:w-4 sm:h-4 text-accent" /></div>
+                    <div><p className="text-[10px] sm:text-xs text-muted">Nama</p><p className="text-xs sm:text-sm font-semibold text-foreground">{scannedGuest.nama}</p></div>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                      <Building2 className="w-3 h-3 sm:w-4 sm:h-4 text-accent" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] sm:text-xs text-muted">Instansi</p>
-                      <p className="text-xs sm:text-sm font-semibold text-foreground">{scannedGuest.instansi}</p>
-                    </div>
+                    <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0"><Building2 className="w-3 h-3 sm:w-4 sm:h-4 text-accent" /></div>
+                    <div><p className="text-[10px] sm:text-xs text-muted">Instansi</p><p className="text-xs sm:text-sm font-semibold text-foreground">{scannedGuest.instansi}</p></div>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                      <Phone className="w-3 h-3 sm:w-4 sm:h-4 text-accent" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] sm:text-xs text-muted">No. HP</p>
-                      <p className="text-xs sm:text-sm font-semibold text-foreground">{scannedGuest.no_hp || "—"}</p>
-                    </div>
+                    <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0"><Phone className="w-3 h-3 sm:w-4 sm:h-4 text-accent" /></div>
+                    <div><p className="text-[10px] sm:text-xs text-muted">No. HP</p><p className="text-xs sm:text-sm font-semibold text-foreground">{scannedGuest.no_hp || "—"}</p></div>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                      <Calendar className="w-3 h-3 sm:w-4 sm:h-4 text-accent" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] sm:text-xs text-muted">Acara</p>
-                      <p className="text-xs sm:text-sm font-semibold text-foreground">
-                        {allEvents.find((e) => e.id === scannedGuest.acara_id)?.nama_acara || "—"}
-                      </p>
-                    </div>
+                    <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0"><Calendar className="w-3 h-3 sm:w-4 sm:h-4 text-accent" /></div>
+                    <div><p className="text-[10px] sm:text-xs text-muted">Acara</p><p className="text-xs sm:text-sm font-semibold text-foreground">{allEvents.find((e) => e.id === scannedGuest.acara_id)?.nama_acara || "—"}</p></div>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                      <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-accent" />
-                    </div>
+                    <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0"><CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-accent" /></div>
                     <div>
                       <p className="text-[10px] sm:text-xs text-muted">Status</p>
                       <span className={`text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full inline-block mt-0.5 ${
-                        scannedGuest.status_kehadiran === "hadir" ? "bg-success-muted text-success border border-success/20" : "bg-warning-muted text-warning border border-warning/20"
-                      }`}>
-                        {scannedGuest.status_kehadiran === "hadir" ? "Sudah Hadir" : "Belum Hadir"}
+                        scannedGuest.status_kehadiran === "hadir" ? "bg-success-muted text-success border border-success/20" :
+                        scannedGuest.status_kehadiran === "terlambat" ? "bg-warning-muted text-warning border border-warning/20" :
+                        "bg-warning-muted text-warning border border-warning/20"}`}>
+                        {scannedGuest.status_kehadiran === "hadir" ? "Sudah Hadir" : scannedGuest.status_kehadiran === "terlambat" ? "Terlambat" : "Belum Hadir"}
                       </span>
                     </div>
                   </div>
                 </div>
-                {scannedGuest.status_kehadiran !== "hadir" && !submitted && (
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={submitting}
-                    className="w-full"
-                  >
+                {scannedGuest.status_kehadiran !== "hadir" && scannedGuest.status_kehadiran !== "terlambat" && !submitted && (
+                  <Button onClick={handleSubmit} disabled={submitting} className="w-full">
                     {submitting ? (
                       <span className="flex items-center gap-2">
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                         Mengirim...
                       </span>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4" />
-                        Konfirmasi Kehadiran
-                      </>
-                    )}
+                    ) : (<><Send className="w-4 h-4" /> Konfirmasi Kehadiran</>)}
                   </Button>
                 )}
-                {submitted && (
-                  <Button
-                    variant="secondary"
-                    className="w-full"
-                    onClick={resetScan}
-                  >
-                    Scan Tamu Lain
-                  </Button>
-                )}
+                {submitted && <Button variant="secondary" className="w-full" onClick={resetScan}>Scan Tamu Lain</Button>}
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 text-center">
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-input/50 flex items-center justify-center mb-3 sm:mb-4">
                   <UserRound className="w-6 h-6 sm:w-8 sm:h-8 text-muted/40" />
                 </div>
-                <p className="text-xs sm:text-sm font-semibold text-muted">
-                  Belum ada data tamu
-                </p>
-                <p className="text-[10px] sm:text-xs text-muted/60 mt-1">
-                  Data akan tampil setelah QR Code berhasil dipindai
-                </p>
+                <p className="text-xs sm:text-sm font-semibold text-muted">Belum ada data tamu</p>
+                <p className="text-[10px] sm:text-xs text-muted/60 mt-1">Data akan tampil setelah QR Code berhasil dipindai</p>
               </div>
             )}
           </div>
@@ -347,9 +271,7 @@ function ScanQRContent() {
         <div className="glass-card rounded-2xl p-4 sm:p-6">
           <div className="flex items-center gap-2 mb-3 sm:mb-4">
             <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-muted" />
-            <h2 className="text-sm sm:text-base font-bold text-foreground">
-              Riwayat Scan
-            </h2>
+            <h2 className="text-sm sm:text-base font-bold text-foreground">Riwayat Scan</h2>
           </div>
           {scanHistory.length > 0 ? (
             <div className="space-y-2 sm:space-y-3">
@@ -369,12 +291,8 @@ function ScanQRContent() {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-10 sm:py-16 px-4 sm:px-6 text-center">
-              <p className="text-xs sm:text-sm font-semibold text-muted">
-                Belum ada riwayat scan
-              </p>
-              <p className="text-[10px] sm:text-xs text-muted/60 mt-1">
-                Riwayat akan muncul setelah tamu berhasil discan
-              </p>
+              <p className="text-xs sm:text-sm font-semibold text-muted">Belum ada riwayat scan</p>
+              <p className="text-[10px] sm:text-xs text-muted/60 mt-1">Riwayat akan muncul setelah tamu berhasil discan</p>
             </div>
           )}
         </div>
@@ -382,12 +300,7 @@ function ScanQRContent() {
 
       {toast && (
         <div className="fixed bottom-6 right-6 z-[60]">
-          <Toast
-            key={toast.id}
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToast(null)}
-          />
+          <Toast key={toast.id} message={toast.message} type={toast.type} onClose={() => setToast(null)} />
         </div>
       )}
     </>

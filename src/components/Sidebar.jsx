@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { QrCode } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 const navItems = [
   {
@@ -48,18 +49,31 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    label: "Kelola Pengguna",
+    href: "/admin/users",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a4 4 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.858M7 20H2v-2a4 4 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+  },
 ];
 
 
 
 export default function Sidebar() {
   const pathname = usePathname() ?? "";
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const supabase = createClient();
 
-  // Close sidebar on route change (mobile)
+  // Close sidebar on route change (mobile) + on resize to desktop
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync drawer state to route change
+    setMobileOpen(false);
+  }, [pathname]);
 
-
-  // Close on outside click / resize to desktop
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 1024) setMobileOpen(false);
@@ -136,15 +150,18 @@ export default function Sidebar() {
             <p className="text-sm font-medium text-foreground truncate">Admin</p>
             <p className="text-[10px] text-muted truncate">admin@bukutamu.id</p>
           </div>
-          <Link
-            href="/admin/login"
-            className="text-muted hover:text-danger transition-colors"
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              router.push("/");
+            }}
+            className="text-muted hover:text-danger transition-colors cursor-pointer"
             title="Logout"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-          </Link>
+          </button>
         </div>
       </div>
     </aside>
