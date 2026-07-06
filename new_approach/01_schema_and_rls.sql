@@ -173,7 +173,6 @@ create policy "Admin can delete profiles"
 -- --- events ------------------------------------------------------------
 drop policy if exists "Anyone can read events" on public.events;
 drop policy if exists "Staff can read events" on public.events;
-drop policy if exists "Authenticated can read events" on public.events;
 create policy "Authenticated can read events"
   on public.events for select
   to authenticated
@@ -209,7 +208,6 @@ create policy "Admin can delete events"
 drop policy if exists "Admin, scanner and staff can read guests" on public.guests;
 drop policy if exists "Admin and scanner can read guests" on public.guests;
 drop policy if exists "Staff can read guests" on public.guests;
-drop policy if exists "Admin, staff and scanner can read guests" on public.guests;
 create policy "Admin, staff and scanner can read guests"
   on public.guests for select
   to authenticated
@@ -231,7 +229,6 @@ create policy "Admin can insert guests"
 -- through register_guest_scan() below, which runs as SECURITY DEFINER
 -- and enforces the timing rules regardless of what the client claims.
 drop policy if exists "Admin and scanner can update guests" on public.guests;
-drop policy if exists "Admin can update guests" on public.guests;
 create policy "Admin can update guests"
   on public.guests for update
   to authenticated
@@ -250,7 +247,6 @@ create policy "Admin can delete guests"
 -- --- activities ------------------------------------------------------------
 drop policy if exists "Users can read activities" on public.activities;
 drop policy if exists "Staff can read activities" on public.activities;
-drop policy if exists "Admin, staff and scanner can read activities" on public.activities;
 create policy "Admin, staff and scanner can read activities"
   on public.activities for select
   to authenticated
