@@ -77,12 +77,12 @@ export async function POST(request, { params }) {
   });
   // --- end diagnostic ---
 
-  if (event.status !== "registrasi_dibuka") {
-    return NextResponse.json({ error: "Registrasi untuk acara ini belum dibuka atau sudah ditutup" }, { status: 400 });
+  if (event.status === "akan_datang") {
+    return NextResponse.json({ error: "Registrasi belum dibuka" }, { status: 400 });
   }
 
-  if (guest.status_kehadiran === "hadir" || guest.status_kehadiran === "terlambat") {
-    return NextResponse.json({ error: "Guest already checked in" }, { status: 409 });
+  if (event.status === "registrasi_ditutup") {
+    return NextResponse.json({ error: "Registrasi sudah ditutup" }, { status: 400 });
   }
 
   const status = computedStatus;
@@ -91,6 +91,10 @@ export async function POST(request, { params }) {
       error: "Acara sudah selesai. Tidak dapat melakukan registrasi kehadiran.",
       code: "EVENT_FINISHED",
     }, { status: 400 });
+  }
+
+  if (guest.status_kehadiran === "hadir" || guest.status_kehadiran === "terlambat") {
+    return NextResponse.json({ error: "Guest already checked in" }, { status: 409 });
   }
 
   const now = new Date();
