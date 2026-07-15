@@ -53,7 +53,15 @@ export async function PUT(request, { params }) {
       .select()
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (error.code === "23505") {
+        return NextResponse.json(
+          { error: "Hanya satu acara yang bisa berstatus Registrasi Dibuka dalam satu waktu." },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json(data);
   } catch (err) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });

@@ -109,7 +109,25 @@ export default function EventsPage() {
       registrasi_dibuka: "Registrasi Dibuka",
       registrasi_ditutup: "Registrasi Ditutup",
     };
-    await updateEvent(event.id, { status: newStatus });
+
+    if (newStatus === "registrasi_dibuka") {
+      const alreadyActive = events.some(
+        (e) => e.status === "registrasi_dibuka" && e.id !== event.id,
+      );
+      if (alreadyActive) {
+        showToast(
+          "Gagal mengubah status. Hanya satu acara yang bisa berstatus Registrasi Dibuka dalam satu waktu.",
+          "error",
+        );
+        return;
+      }
+    }
+
+    const result = await updateEvent(event.id, { status: newStatus });
+    if (!result) {
+      showToast("Gagal mengubah status acara. Silakan coba lagi.", "error");
+      return;
+    }
     logActivity("update_status", `Mengubah status "${event.nama_acara}" menjadi "${statusLabels[newStatus]}"`);
     showToast("Status acara berhasil diperbarui!");
   };
