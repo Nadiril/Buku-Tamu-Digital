@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 const GuestContext = createContext(null);
 
@@ -23,16 +24,35 @@ export function GuestProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
-    fetchGuests();
-    const interval = setInterval(fetchGuests, 30000);
-    const onFocus = () => fetchGuests();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
+    const load = async () => {
+      try {
+        const res = await fetch("/api/guests");
+        if (res.ok) {
+          const data = await res.json();
+          setGuests(data);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setLoaded(true);
+      }
     };
-  }, [fetchGuests]);
+    load();
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel("guests-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "guests" },
+        () => load()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const addGuest = async (guest) => {
     const res = await fetch("/api/guests", {
@@ -80,8 +100,9 @@ export function GuestProvider({ children }) {
     return guests.filter((g) => g.acara_id === parseInt(eventId));
   };
 
+  const value = useMemo(() => ({ guests, loaded, addGuest, updateGuest, deleteGuest, getGuestByToken, getGuestsByEvent, setGuests, fetchGuests }), [guests, loaded, addGuest, updateGuest, deleteGuest, getGuestByToken, getGuestsByEvent, setGuests, fetchGuests]);
   return (
-    <GuestContext.Provider value={{ guests, loaded, addGuest, updateGuest, deleteGuest, getGuestByToken, getGuestsByEvent, setGuests, fetchGuests }}>
+    <GuestContext.Provider value={value}>
       {children}
     </GuestContext.Provider>
   );

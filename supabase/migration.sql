@@ -11,7 +11,7 @@
 create table if not exists public.profiles (
   id uuid references auth.users(id) on delete cascade primary key,
   username text unique,
-  role text not null default 'staff' check (role in ('admin', 'scanner', 'staff')),
+  role text not null default 'panitia' check (role in ('admin', 'panitia')),
   display_name text,
   no_hp text,
   created_at timestamptz not null default now()
@@ -119,13 +119,10 @@ create index if not exists idx_activities_timestamp on public.activities("timest
 -- RLS POLICIES
 -- All policies dropped and recreated so this file is idempotent.
 -- Role model:
---   admin    -> full CRUD everywhere (per your spec)
---   staff    -> read-only everywhere (per your spec)
---   scanner  -> read events/guests (needed to render the scan screen),
---               NO direct write access to guests. Writes only happen
---               through register_guest_scan(), a SECURITY DEFINER
---               function below, so every write is validated server-side
---               instead of trusting whatever the client sends.
+--   admin    -> full CRUD everywhere
+--   panitia  -> read events/guests, NO direct write access to guests.
+--               Writes only happen through register_guest_scan(), a SECURITY
+--               DEFINER function below, so every write is validated server-side.
 -- =====================================================================
 
 -- --- profiles ---------------------------------------------------------
@@ -204,17 +201,16 @@ create policy "Admin can delete events"
   );
 
 -- --- guests --------------------------------------------------------------
--- Read: admin, staff, scanner can all read (staff needs this for the
--- "who's registered / who's late / who's not registered" view you described).
 drop policy if exists "Admin, scanner and staff can read guests" on public.guests;
 drop policy if exists "Admin and scanner can read guests" on public.guests;
 drop policy if exists "Staff can read guests" on public.guests;
 drop policy if exists "Admin, staff and scanner can read guests" on public.guests;
-create policy "Admin, staff and scanner can read guests"
+drop policy if exists "Authenticated can read guests" on public.guests;
+create policy "Authenticated can read guests"
   on public.guests for select
   to authenticated
   using (
-    exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'staff', 'scanner'))
+    exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'panitia'))
   );
 
 -- Insert: admin only (pre-registering a guest before the event / issuing a QR).
@@ -251,11 +247,12 @@ create policy "Admin can delete guests"
 drop policy if exists "Users can read activities" on public.activities;
 drop policy if exists "Staff can read activities" on public.activities;
 drop policy if exists "Admin, staff and scanner can read activities" on public.activities;
-create policy "Admin, staff and scanner can read activities"
+drop policy if exists "Authenticated can read activities" on public.activities;
+create policy "Authenticated can read activities"
   on public.activities for select
   to authenticated
   using (
-    exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'staff', 'scanner'))
+    exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'panitia'))
   );
 
 -- Insert: admin only via direct access. The previous policy's
@@ -264,11 +261,12 @@ create policy "Admin, staff and scanner can read activities"
 -- writes its own audit rows as SECURITY DEFINER, bypassing this policy
 -- legitimately, which is the only other place activity rows should come from.
 drop policy if exists "Admin can insert activities" on public.activities;
-create policy "Admin can insert activities"
+drop policy if exists "Authenticated can insert activities" on public.activities;
+create policy "Authenticated can insert activities"
   on public.activities for insert
   to authenticated
   with check (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'panitia'))
   );
 
 -- ---------------------------------------------------------------------
@@ -285,7 +283,7 @@ begin
   values (
     new.id,
     new.email,
-    coalesce(new.raw_user_meta_data ->> 'role', 'staff'),
+    coalesce(new.raw_user_meta_data ->> 'role', 'panitia'),
     coalesce(new.raw_user_meta_data ->> 'display_name', split_part(new.email, '@', 1))
   );
   return new;
@@ -296,3 +294,142 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- =====================================================================
+-- register_guest_scan() — single write path for QR scans
+-- SECURITY DEFINER; validates timing via DB clock, caller role.
+-- Status transitions: tidak_hadir -> hadir/terlambat
+-- =====================================================================
+
+drop function if exists public.register_guest_scan(text, uuid);
+
+create or replace function public.register_guest_scan(p_qr_token text, p_caller_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_guest public.guests%rowtype;
+  v_event public.events%rowtype;
+  v_now timestamptz := now();
+  v_event_start timestamptz;
+  v_grace_cutoff timestamptz;
+  v_event_end timestamptz;
+  v_caller_role text;
+  v_new_status text;
+begin
+  select role into v_caller_role
+  from public.profiles
+  where id = p_caller_id;
+
+  if v_caller_role is null or v_caller_role not in ('admin', 'panitia') then
+    return jsonb_build_object(
+      'success', false,
+      'error_code', 'forbidden',
+      'message', 'Only admin or panitia accounts can register a scan.'
+    );
+  end if;
+
+  select * into v_guest
+  from public.guests
+  where qr_token = p_qr_token
+  for update;
+
+  if not found then
+    return jsonb_build_object(
+      'success', false,
+      'error_code', 'invalid_qr',
+      'message', 'This QR code does not match any registered guest.'
+    );
+  end if;
+
+  select * into v_event
+  from public.events
+  where id = v_guest.acara_id;
+
+  if not found then
+    return jsonb_build_object(
+      'success', false,
+      'error_code', 'event_not_found',
+      'message', 'The event for this guest no longer exists.'
+    );
+  end if;
+
+  if v_event.status <> 'registrasi_dibuka' then
+    return jsonb_build_object(
+      'success', false,
+      'error_code', 'registration_not_open',
+      'message', 'Registration for this event is not currently open.'
+    );
+  end if;
+
+  v_event_start  := (v_event.tanggal_mulai + v_event.jam_mulai) AT TIME ZONE 'Asia/Jakarta';
+  v_grace_cutoff := v_event_start + make_interval(mins => v_event.grace_period_minutes);
+  v_event_end    := (v_event.tanggal_selesai + v_event.jam_selesai) AT TIME ZONE 'Asia/Jakarta';
+
+  if v_now > v_event_end then
+    insert into public.activities (action, detail, user_id)
+    values (
+      'scan_rejected_event_ended',
+      format('Guest %s (id=%s) scan attempted after event end at %s', v_guest.nama, v_guest.id, v_now),
+      p_caller_id
+    );
+    return jsonb_build_object(
+      'success', false,
+      'error_code', 'event_ended',
+      'message', 'This event has ended. Registration is closed.'
+    );
+  end if;
+
+  if v_guest.status_kehadiran <> 'tidak_hadir' then
+    return jsonb_build_object(
+      'success', false,
+      'error_code', 'already_registered',
+      'message', format('Guest already registered as %s.', v_guest.status_kehadiran),
+      'guest', jsonb_build_object(
+        'id', v_guest.id,
+        'nama', v_guest.nama,
+        'status_kehadiran', v_guest.status_kehadiran,
+        'waktu_kedatangan', v_guest.waktu_kedatangan
+      )
+    );
+  end if;
+
+  if v_now <= v_grace_cutoff then
+    v_new_status := 'hadir';
+  else
+    v_new_status := 'terlambat';
+  end if;
+
+  update public.guests
+  set
+    status_kehadiran = v_new_status,
+    waktu_kedatangan = v_now,
+    scanned_by = p_caller_id
+  where id = v_guest.id;
+
+  insert into public.activities (action, detail, user_id)
+  values (
+    'guest_scanned',
+    format('Guest %s (id=%s) marked %s at %s', v_guest.nama, v_guest.id, v_new_status, v_now),
+    p_caller_id
+  );
+
+  return jsonb_build_object(
+    'success', true,
+    'status_kehadiran', v_new_status,
+    'guest', jsonb_build_object(
+      'id', v_guest.id,
+      'nama', v_guest.nama,
+      'instansi', v_guest.instansi,
+      'status_kehadiran', v_new_status,
+      'waktu_kedatangan', v_now
+    )
+  );
+end;
+$$;
+
+grant execute on function public.register_guest_scan(text, uuid) to authenticated;
+
+notify pgrst, 'reload schema';

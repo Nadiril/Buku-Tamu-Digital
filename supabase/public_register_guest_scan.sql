@@ -63,9 +63,9 @@ begin
   end if;
 
   -- 4. Compute time boundaries.
-  v_event_start  := (v_event.tanggal_mulai + v_event.jam_mulai)::timestamptz;
+  v_event_start  := (v_event.tanggal_mulai + v_event.jam_mulai) AT TIME ZONE 'Asia/Jakarta';
   v_grace_cutoff := v_event_start + make_interval(mins => v_event.grace_period_minutes);
-  v_event_end    := (v_event.tanggal_selesai + v_event.jam_selesai)::timestamptz;
+  v_event_end    := (v_event.tanggal_selesai + v_event.jam_selesai) AT TIME ZONE 'Asia/Jakarta';
 
   -- 5. Hard cutoff — event has ended.
   if v_now > v_event_end then
@@ -133,3 +133,5 @@ $$;
 -- Grant execute to public so unauthenticated guests can self-scan.
 -- All validation is done server-side regardless of the caller's auth state.
 grant execute on function public.public_register_guest_scan(text) to public;
+
+notify pgrst, 'reload schema';

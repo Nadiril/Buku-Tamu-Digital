@@ -21,7 +21,10 @@
 --                                 of the app is showing a success state.
 -- =====================================================================
 
-create or replace function public.register_guest_scan(p_qr_token text)
+-- Drop the old version first (signature changed: now takes p_caller_id)
+drop function if exists public.register_guest_scan(text);
+
+create function public.register_guest_scan(p_qr_token text, p_caller_id uuid)
 returns jsonb
 language plpgsql
 security definer
@@ -37,17 +40,16 @@ declare
   v_caller_role text;
   v_new_status text;
 begin
-  -- 1. Caller must be admin or scanner. Staff is explicitly excluded —
-  --    staff is read-only per spec and should never reach this function.
+  -- 1. Caller must be admin or panitia.
   select role into v_caller_role
   from public.profiles
-  where id = auth.uid();
+  where id = p_caller_id;
 
-  if v_caller_role is null or v_caller_role not in ('admin', 'scanner') then
+  if v_caller_role is null or v_caller_role not in ('admin', 'panitia') then
     return jsonb_build_object(
       'success', false,
       'error_code', 'forbidden',
-      'message', 'Only admin or scanner accounts can register a scan.'
+      'message', 'Only admin or panitia accounts can register a scan.'
     );
   end if;
 
@@ -112,7 +114,7 @@ begin
     values (
       'scan_rejected_event_ended',
       format('Guest %s (id=%s) scan attempted after event end at %s', v_guest.nama, v_guest.id, v_now),
-      auth.uid()
+      p_caller_id
     );
     return jsonb_build_object(
       'success', false,
@@ -148,14 +150,14 @@ begin
   set
     status_kehadiran = v_new_status,
     waktu_kedatangan = v_now,
-    scanned_by = auth.uid()
+    scanned_by = p_caller_id
   where id = v_guest.id;
 
   insert into public.activities (action, detail, user_id)
   values (
     'guest_scanned',
     format('Guest %s (id=%s) marked %s at %s', v_guest.nama, v_guest.id, v_new_status, v_now),
-    auth.uid()
+    p_caller_id
   );
 
   return jsonb_build_object(
@@ -172,9 +174,7 @@ begin
 end;
 $$;
 
--- Grant execute to authenticated users. The function itself checks the
--- caller's role internally (step 1 above) and returns a JSON error rather
--- than relying on GRANT/REVOKE to gate access — this keeps the "forbidden"
--- case a normal, catchable response for the client instead of a raw
--- Postgres permission error.
-grant execute on function public.register_guest_scan(text) to authenticated;
+-- Grant execute to authenticated users.
+grant execute on function public.register_guest_scan(text, uuid) to authenticated;
+
+notify pgrst, 'reload schema';

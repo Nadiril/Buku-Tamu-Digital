@@ -12,7 +12,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Buku Tamu Digital Multi-Event Guest Book",
+  title: "Buku Tamu Digital",
   description:
     "Platform buku tamu digital multi-event untuk pencatatan kehadiran tamu secara modern dan efisien.",
 };

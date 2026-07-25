@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 const ActivityContext = createContext(null);
 
@@ -23,9 +24,35 @@ export function ActivityProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
-    fetchActivities();
-  }, [fetchActivities]);
+    const load = async () => {
+      try {
+        const res = await fetch("/api/activities");
+        if (res.ok) {
+          const data = await res.json();
+          setActivities(data);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setLoaded(true);
+      }
+    };
+    load();
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel("activities-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "activities" },
+        () => load()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const logActivity = async (action, detail, meta = {}) => {
     try {
@@ -37,7 +64,6 @@ export function ActivityProvider({ children }) {
     } catch {
       // ignore
     }
-    // Optimistic update
     const activity = {
       id: Date.now(),
       action,
@@ -52,8 +78,9 @@ export function ActivityProvider({ children }) {
     setActivities([]);
   };
 
+  const value = useMemo(() => ({ activities, logActivity, clearActivities, fetchActivities }), [activities, logActivity, clearActivities, fetchActivities]);
   return (
-    <ActivityContext.Provider value={{ activities, logActivity, clearActivities }}>
+    <ActivityContext.Provider value={value}>
       {children}
     </ActivityContext.Provider>
   );

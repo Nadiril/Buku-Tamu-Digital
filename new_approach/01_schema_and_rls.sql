@@ -11,7 +11,7 @@
 create table if not exists public.profiles (
   id uuid references auth.users(id) on delete cascade primary key,
   username text unique,
-  role text not null default 'staff' check (role in ('admin', 'scanner', 'staff')),
+  role text not null default 'panitia' check (role in ('admin', 'panitia')),
   display_name text,
   no_hp text,
   created_at timestamptz not null default now()
@@ -120,8 +120,7 @@ create index if not exists idx_activities_timestamp on public.activities("timest
 -- All policies dropped and recreated so this file is idempotent.
 -- Role model:
 --   admin    -> full CRUD everywhere (per your spec)
---   staff    -> read-only everywhere (per your spec)
---   scanner  -> read events/guests (needed to render the scan screen),
+--   panitia  -> read events/guests,
 --               NO direct write access to guests. Writes only happen
 --               through register_guest_scan(), a SECURITY DEFINER
 --               function below, so every write is validated server-side
@@ -203,16 +202,15 @@ create policy "Admin can delete events"
   );
 
 -- --- guests --------------------------------------------------------------
--- Read: admin, staff, scanner can all read (staff needs this for the
--- "who's registered / who's late / who's not registered" view you described).
+-- Read: admin, panitia can all read.
 drop policy if exists "Admin, scanner and staff can read guests" on public.guests;
 drop policy if exists "Admin and scanner can read guests" on public.guests;
 drop policy if exists "Staff can read guests" on public.guests;
-create policy "Admin, staff and scanner can read guests"
+create policy "Authenticated can read guests"
   on public.guests for select
   to authenticated
   using (
-    exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'staff', 'scanner'))
+    exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'panitia'))
   );
 
 -- Insert: admin only (pre-registering a guest before the event / issuing a QR).
@@ -247,11 +245,11 @@ create policy "Admin can delete guests"
 -- --- activities ------------------------------------------------------------
 drop policy if exists "Users can read activities" on public.activities;
 drop policy if exists "Staff can read activities" on public.activities;
-create policy "Admin, staff and scanner can read activities"
+create policy "Authenticated can read activities"
   on public.activities for select
   to authenticated
   using (
-    exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'staff', 'scanner'))
+    exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'panitia'))
   );
 
 -- Insert: admin only via direct access. The previous policy's
@@ -260,11 +258,11 @@ create policy "Admin, staff and scanner can read activities"
 -- writes its own audit rows as SECURITY DEFINER, bypassing this policy
 -- legitimately, which is the only other place activity rows should come from.
 drop policy if exists "Admin can insert activities" on public.activities;
-create policy "Admin can insert activities"
+create policy "Authenticated can insert activities"
   on public.activities for insert
   to authenticated
   with check (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'panitia'))
   );
 
 -- ---------------------------------------------------------------------
@@ -281,7 +279,7 @@ begin
   values (
     new.id,
     new.email,
-    coalesce(new.raw_user_meta_data ->> 'role', 'staff'),
+    coalesce(new.raw_user_meta_data ->> 'role', 'panitia'),
     coalesce(new.raw_user_meta_data ->> 'display_name', split_part(new.email, '@', 1))
   );
   return new;

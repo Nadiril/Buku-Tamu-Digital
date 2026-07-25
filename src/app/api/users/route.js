@@ -61,14 +61,14 @@ export async function POST(request) {
       );
     }
 
-    if (!["admin", "scanner", "staff"].includes(role)) {
+    if (!["admin", "panitia"].includes(role)) {
       return NextResponse.json(
-        { error: "Invalid role. Must be admin, scanner, or staff" },
+        { error: "Invalid role. Must be admin or panitia" },
         { status: 400 }
       );
     }
 
-    const serviceSupabase = createServiceClient();
+    const serviceSupabase = await createServiceClient();
 
     const { data: authUser, error: authError } =
       await serviceSupabase.auth.admin.createUser({

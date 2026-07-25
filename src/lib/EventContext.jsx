@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 const EventContext = createContext(null);
 
@@ -23,16 +24,35 @@ export function EventProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
-    fetchEvents();
-    const interval = setInterval(fetchEvents, 30000);
-    const onFocus = () => fetchEvents();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
+    const load = async () => {
+      try {
+        const res = await fetch("/api/events");
+        if (res.ok) {
+          const data = await res.json();
+          setEvents(data);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setLoaded(true);
+      }
     };
-  }, [fetchEvents]);
+    load();
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel("events-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "events" },
+        () => load()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const addEvent = async (event) => {
     const res = await fetch("/api/events", {
@@ -79,8 +99,9 @@ export function EventProvider({ children }) {
     return events.find((e) => e.slug === slug) || null;
   };
 
+  const value = useMemo(() => ({ events, loaded, addEvent, updateEvent, deleteEvent, getEventById, getEventBySlug, setEvents, fetchEvents }), [events, loaded, addEvent, updateEvent, deleteEvent, getEventById, getEventBySlug, setEvents, fetchEvents]);
   return (
-    <EventContext.Provider value={{ events, loaded, addEvent, updateEvent, deleteEvent, getEventById, getEventBySlug, setEvents, fetchEvents }}>
+    <EventContext.Provider value={value}>
       {children}
     </EventContext.Provider>
   );

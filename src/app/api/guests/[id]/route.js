@@ -15,7 +15,7 @@ export async function PUT(request, { params }) {
     .eq("id", user.id)
     .single();
 
-  if (!profile || !["admin", "scanner"].includes(profile.role)) {
+  if (!profile || !["admin", "panitia"].includes(profile.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

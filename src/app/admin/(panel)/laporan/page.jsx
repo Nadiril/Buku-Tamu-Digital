@@ -7,6 +7,7 @@ import Button from "@/components/Button";
 import { useGuests } from "@/lib/GuestContext";
 import { useEvents } from "@/lib/EventContext";
 import { useActivity } from "@/lib/ActivityContext";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { FileDown, FileSpreadsheet, Users, CheckCircle, XCircle, AlertTriangle, TrendingUp } from "lucide-react";
 
 const statusLabel = {
@@ -118,7 +119,11 @@ export default function LaporanPage() {
     XLSX.writeFile(wb, `laporan-tamu${eventFilter ? `-${getEventName(parseInt(eventFilter)).replace(/\s+/g, "-")}` : ""}-${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
-  const maxChartVal = Math.max(hadir, terlambat, belumHadir, 1);
+  const chartData = [
+    { name: "Hadir", value: hadir, fill: "#22c55e" },
+    { name: "Terlambat", value: terlambat, fill: "#f59e0b" },
+    { name: "Tidak Hadir", value: belumHadir, fill: "#ef4444" },
+  ];
 
   return (
     <>
@@ -196,60 +201,19 @@ export default function LaporanPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="space-y-3">
-                <div>
-                  <div className="flex justify-between text-sm mb-1.5">
-                    <span className="font-medium text-foreground">Hadir</span>
-                    <span className="text-muted">{hadir} tamu</span>
-                  </div>
-                  <div className="w-full bg-muted/10 rounded-full h-3 overflow-hidden">
-                    <div
-                      className="bg-success h-full rounded-full transition-all duration-500"
-                      style={{ width: `${(hadir / maxChartVal) * 100}%` }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1.5">
-                    <span className="font-medium text-foreground">Terlambat</span>
-                    <span className="text-muted">{terlambat} tamu</span>
-                  </div>
-                  <div className="w-full bg-muted/10 rounded-full h-3 overflow-hidden">
-                    <div
-                      className="bg-warning h-full rounded-full transition-all duration-500"
-                      style={{ width: `${(terlambat / maxChartVal) * 100}%` }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1.5">
-                    <span className="font-medium text-foreground">Tidak Hadir</span>
-                    <span className="text-muted">{belumHadir} tamu</span>
-                  </div>
-                  <div className="w-full bg-muted/10 rounded-full h-3 overflow-hidden">
-                    <div
-                      className="bg-danger h-full rounded-full transition-all duration-500"
-                      style={{ width: `${(belumHadir / maxChartVal) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-center gap-6 pt-2 text-xs text-muted">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-sm bg-success" />
-                  Hadir
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-sm bg-warning" />
-                  Terlambat
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-sm bg-danger" />
-                  Tidak Hadir
-                </div>
-              </div>
-            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+                <XAxis dataKey="name" tick={{ fontSize: 13 }} />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={60}>
+                  {chartData.map((entry, idx) => (
+                    <Cell key={idx} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           )}
         </div>
 

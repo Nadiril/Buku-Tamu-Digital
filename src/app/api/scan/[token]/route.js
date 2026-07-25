@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 //
-// scan/[token] — authenticated scanner/admin scan endpoint
+// scan/[token] — authenticated panitia/admin scan endpoint
 //
 // This endpoint delegates to register_guest_scan() — a SECURITY DEFINER
 // PostgreSQL function — which validates timing using the database clock
@@ -25,8 +25,10 @@ export async function POST(request, { params }) {
   }
 
   // 2. Call the SECURITY DEFINER function that handles all validation
+  //    p_caller_id is passed explicitly (not relying on auth.uid() inside the function)
   const { data, error } = await supabase.rpc("register_guest_scan", {
     p_qr_token: token,
+    p_caller_id: user.id,
   });
 
   if (error) {
@@ -36,6 +38,7 @@ export async function POST(request, { params }) {
 
   // 3. The function returns a jsonb response with { success, error_code, message, ... }
   if (!data.success) {
+    console.log("[scan] RPC returned:", JSON.stringify(data));
     const statusMap = {
       invalid_qr: 404,
       event_not_found: 404,

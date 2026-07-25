@@ -4,8 +4,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { QrCode } from "lucide-react";
+import { QrCode, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useProfile } from "@/lib/ProfileContext";
 
 const navItems = [
   {
@@ -60,17 +61,18 @@ const navItems = [
   },
 ];
 
-
-
 export default function Sidebar() {
   const pathname = usePathname() ?? "";
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const { profile } = useProfile();
   const supabase = createClient();
 
-  // Close sidebar on route change (mobile) + on resize to desktop
+  const displayName = profile?.display_name || "Admin";
+  const email = profile?.email || "";
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync drawer state to route change
     setMobileOpen(false);
   }, [pathname]);
 
@@ -82,34 +84,44 @@ export default function Sidebar() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  useEffect(() => {
+    document.documentElement.style.setProperty("--sidebar-w", collapsed ? "72px" : "256px");
+  }, [collapsed]);
+
+  const sidebarWidth = collapsed ? "w-[72px]" : "w-64";
+
   const sidebarContent = (
-    <aside className="flex flex-col h-full w-64 bg-sidebar border-r border-border">
+    <aside className={`flex flex-col h-full ${sidebarWidth} bg-sidebar border-r border-border transition-all duration-300 ease-in-out`}>
       {/* Logo */}
-      <div className="px-6 py-5 border-b border-border">
-        <Link href="/admin/dashboard" className="flex items-center gap-3">
+      <div className={`flex items-center border-b border-border ${collapsed ? "justify-center px-0 py-4" : "px-6 py-5"}`}>
+        <Link href="/admin/dashboard" className={`flex items-center ${collapsed ? "flex-col gap-2" : "gap-3"}`}>
           <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center overflow-hidden shadow-lg shadow-accent/20 shrink-0">
             <Image
               src="/Logo.webp"
-              alt="Logo STIKOM PGRI Banyuwangi"
-              width={40}
-              height={40}
+              alt="Buku Tamu Digital"
+              width={collapsed ? 36 : 40}
+              height={collapsed ? 36 : 40}
               className="object-contain w-full h-full"
               priority
               unoptimized
             />
           </div>
-          <div>
-            <h1 className="text-sm font-bold text-foreground leading-tight">STIKOM PGRI</h1>
-            <p className="text-[10px] text-muted font-medium tracking-wider uppercase">Banyuwangi</p>
-          </div>
+          {!collapsed && (
+            <div>
+              <h1 className="text-sm font-bold text-foreground leading-tight tracking-tight">Buku Tamu Digital</h1>
+              <p className="text-[10px] text-muted font-medium">Panel Admin</p>
+            </div>
+          )}
         </Link>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        <p className="px-3 mb-3 text-[10px] font-semibold text-muted uppercase tracking-widest">
-          Menu Utama
-        </p>
+      <nav className={`flex-1 overflow-y-auto py-4 space-y-1 ${collapsed ? "px-2" : "px-3"}`}>
+        {!collapsed && (
+          <p className="px-3 mb-3 text-[10px] font-semibold text-muted uppercase tracking-widest">
+            Menu Utama
+          </p>
+        )}
         {navItems.map((item) => {
           const isActive =
             pathname === item.href || pathname.startsWith(item.href + "/");
@@ -117,13 +129,15 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group
+              className={`flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200 group
+                ${collapsed ? "justify-center py-3" : "px-3 py-2.5"}
                 ${
                   isActive
                     ? "bg-accent/10 text-accent border border-accent/20"
                     : "text-muted hover:text-foreground hover:bg-card"
                 }
               `}
+              title={collapsed ? item.label : undefined}
             >
               <span
                 className={`${
@@ -134,34 +148,44 @@ export default function Sidebar() {
               >
                 {item.icon}
               </span>
-              {item.label}
+              {!collapsed && item.label}
             </Link>
           );
         })}
       </nav>
 
+      {/* Collapse Toggle (Desktop) */}
+      <button
+        onClick={() => setCollapsed((c) => !c)}
+        className="hidden lg:flex items-center justify-center w-full py-3 border-t border-border text-muted hover:text-foreground transition-colors cursor-pointer"
+      >
+        {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+      </button>
+
       {/* Footer */}
-      <div className="px-4 py-4 border-t border-border">
-        <div className="flex items-center gap-3 px-2">
-          <div className="w-8 h-8 rounded-full bg-accent-muted text-accent flex items-center justify-center text-xs font-bold">
-            AD
+      <div className={`border-t border-border ${collapsed ? "px-0 py-3 flex justify-center" : "px-4 py-4"}`}>
+        <div className={`flex items-center gap-3 ${collapsed ? "" : "px-2"}`}>
+          <div className={`shrink-0 rounded-full bg-accent-muted text-accent flex items-center justify-center text-xs font-bold ${collapsed ? "w-8 h-8" : "w-8 h-8"}`}>
+            {displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "AD"}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">Admin</p>
-            <p className="text-[10px] text-muted truncate">admin@bukutamu.id</p>
-          </div>
-          <button
-            onClick={async () => {
-              await supabase.auth.signOut();
-              router.push("/");
-            }}
-            className="text-muted hover:text-danger transition-colors cursor-pointer"
-            title="Logout"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-          </button>
+          {!collapsed && (
+            <>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
+                <p className="text-[10px] text-muted truncate">{email}</p>
+              </div>
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  router.push("/");
+                }}
+                className="text-muted hover:text-danger transition-colors cursor-pointer"
+                title="Logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </>
+          )}
         </div>
       </div>
     </aside>
@@ -170,7 +194,7 @@ export default function Sidebar() {
   return (
     <>
       {/* ── Desktop: sidebar fixed di kiri ── */}
-      <div className="hidden lg:block fixed left-0 top-0 h-screen z-40">
+      <div className={`hidden lg:block fixed left-0 top-0 h-screen z-40 transition-all duration-300 ${sidebarWidth}`}>
         {sidebarContent}
       </div>
 
@@ -188,12 +212,10 @@ export default function Sidebar() {
       {/* ── Mobile: overlay + drawer ── */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          {/* Drawer */}
           <div className="relative h-full">
             {sidebarContent}
           </div>

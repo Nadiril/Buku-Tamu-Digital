@@ -3,21 +3,50 @@ import { updateSession } from "@/lib/supabase/middleware";
 
 const publicRoutes = ["/", "/event/", "/scan/", "/api/public/", "/api/auth/"];
 
-export async function proxy(request) {
-  const { supabaseResponse, user } = await updateSession(request);
+export default async function proxy(request) {
+  try {
+    const { supabaseResponse, user, supabase } = await updateSession(request);
 
-  const pathname = request.nextUrl.pathname;
+    const pathname = request.nextUrl.pathname;
 
-  const isPublic = publicRoutes.some((r) => pathname === r || pathname.startsWith(r));
-  const isStaticAsset = pathname.startsWith("/_next") || pathname.startsWith("/favicon");
+    const isPublic = publicRoutes.some((r) => pathname === r || pathname.startsWith(r));
+    const isStaticAsset = pathname.startsWith("/_next") || pathname.startsWith("/favicon");
 
-  if (!user && !isPublic && !isStaticAsset) {
+    if (!user) {
+      if (!isPublic && !isStaticAsset) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/";
+        return NextResponse.redirect(url);
+      }
+      return supabaseResponse;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    const role = profile?.role;
+
+    if (pathname.startsWith("/admin") && role !== "admin") {
+      const url = request.nextUrl.clone();
+      url.pathname = role === "panitia" ? "/panitia" : "/";
+      return NextResponse.redirect(url);
+    }
+
+    if (pathname.startsWith("/panitia") && role !== "panitia") {
+      const url = request.nextUrl.clone();
+      url.pathname = role === "admin" ? "/admin/dashboard" : "/";
+      return NextResponse.redirect(url);
+    }
+
+    return supabaseResponse;
+  } catch (error) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
   }
-
-  return supabaseResponse;
 }
 
 export const config = {

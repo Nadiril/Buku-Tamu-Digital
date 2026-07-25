@@ -1,30 +1,21 @@
--- =====================================================================
--- register_guest_scan()
--- The single, sanctioned write path for QR scans.
---
--- Why this exists as a function instead of a client-side UPDATE:
--- your spec requires that a scan attempted after the event has ended
--- must NOT register, even if the client displays "success." A client
--- can always be tricked, offline-cached, or just wrong about the time.
--- The only way to guarantee the cutoff is enforced is to compute it
--- from database time (`now()`) inside a function the client cannot
--- talk its way around — RLS policies alone can't express "reject after
--- time X and tell me WHY," only "allow or deny the row."
---
--- Status transitions:
---   tidak_hadir -> hadir       (scanned at or before jam_mulai + grace_period_minutes)
---   tidak_hadir -> terlambat   (scanned after grace period, but before jam_selesai)
---   already hadir/terlambat   -> rejected, "already registered" (no double-scan)
---   scanned after jam_selesai -> rejected, "event has ended" — this is the
---                                 hard cutoff your spec calls out explicitly:
---                                 it must fail here even if some other layer
---                                 of the app is showing a success state.
--- =====================================================================
+-- Hapus SEMUA overload register_guest_scan yang ada (lama maupun baru)
+do $$
+declare
+  r record;
+begin
+  for r in
+    select p.oid, pg_catalog.pg_get_function_identity_arguments(p.oid) as args
+    from pg_catalog.pg_proc p
+    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'register_guest_scan'
+  loop
+    execute format('drop function if exists public.register_guest_scan(%s)', r.args);
+  end loop;
+end;
+$$;
 
--- Drop existing overloads so this script is idempotent
-drop function if exists public.register_guest_scan(text, uuid);
-
-create or replace function public.register_guest_scan(p_qr_token text, p_caller_id uuid)
+-- Buat ulang dengan parameter p_qr_token, p_caller_id
+create function public.register_guest_scan(p_qr_token text, p_caller_id uuid)
 returns jsonb
 language plpgsql
 security definer
@@ -40,7 +31,6 @@ declare
   v_caller_role text;
   v_new_status text;
 begin
-  -- 1. Caller must be admin or panitia.
   select role into v_caller_role
   from public.profiles
   where id = p_caller_id;
@@ -53,12 +43,6 @@ begin
     );
   end if;
 
-  -- 2. Look up the guest by QR token. Lock the row so two near-simultaneous
-  --    scans of the same QR (e.g. a flaky scanner double-firing) can't both
-  --    read "tidak_hadir" and both attempt to transition it — the second
-  --    scanner blocks on this row lock until the first transaction commits,
-  --    then re-reads the now-updated status and correctly reports
-  --    "already registered" instead of double-processing the same guest.
   select * into v_guest
   from public.guests
   where qr_token = p_qr_token
@@ -72,7 +56,6 @@ begin
     );
   end if;
 
-  -- 3. Load the associated event.
   select * into v_event
   from public.events
   where id = v_guest.acara_id;
@@ -85,12 +68,6 @@ begin
     );
   end if;
 
-  -- 4. Registration must be open. This blocks scans against an event that
-  --    hasn't opened yet ('akan_datang') or has been explicitly closed
-  --    ('registrasi_ditutup') by an admin, independent of the time-based
-  --    cutoff in step 6 below. Both checks are needed: an admin might close
-  --    registration early, or an event might still be marked open past its
-  --    scheduled end time if nobody closed it manually.
   if v_event.status <> 'registrasi_dibuka' then
     return jsonb_build_object(
       'success', false,
@@ -99,16 +76,10 @@ begin
     );
   end if;
 
-  -- 5. Compute the time boundaries from stored date/time columns.
   v_event_start  := (v_event.tanggal_mulai + v_event.jam_mulai) AT TIME ZONE 'Asia/Jakarta';
   v_grace_cutoff := v_event_start + make_interval(mins => v_event.grace_period_minutes);
   v_event_end    := (v_event.tanggal_selesai + v_event.jam_selesai) AT TIME ZONE 'Asia/Jakarta';
 
-  -- 6. Hard cutoff — this is the case your spec calls out explicitly:
-  --    "if try to register beyond that time it won't register because
-  --    event has ended even it says success." The rejection happens here,
-  --    server-side, using database time. No client-supplied timestamp is
-  --    ever trusted for this comparison.
   if v_now > v_event_end then
     insert into public.activities (action, detail, user_id)
     values (
@@ -123,8 +94,6 @@ begin
     );
   end if;
 
-  -- 7. Reject a guest who has already been scanned. No double-registration,
-  --    no overwriting an existing 'hadir' with 'terlambat' or vice versa.
   if v_guest.status_kehadiran <> 'tidak_hadir' then
     return jsonb_build_object(
       'success', false,
@@ -139,7 +108,6 @@ begin
     );
   end if;
 
-  -- 8. On-time vs late, per the grace-period rule you specified.
   if v_now <= v_grace_cutoff then
     v_new_status := 'hadir';
   else
@@ -174,7 +142,6 @@ begin
 end;
 $$;
 
--- Grant execute to authenticated users.
 grant execute on function public.register_guest_scan(text, uuid) to authenticated;
 
 notify pgrst, 'reload schema';

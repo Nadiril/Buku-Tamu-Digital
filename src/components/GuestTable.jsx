@@ -22,6 +22,8 @@ export default function GuestTable({ guests, showEvent = false, events = [], onE
   const [kategoriFilter, setKategoriFilter] = useState("");
   const [qrGuest, setQrGuest] = useState(null);
   const [detailGuest, setDetailGuest] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailStatus, setEmailStatus] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const menuRef = useRef(null);
@@ -101,6 +103,33 @@ export default function GuestTable({ guests, showEvent = false, events = [], onE
 
   const hasActions = !!(onEdit || onDelete);
   const cols = (showEvent ? 7 : 6) + (hasActions ? 1 : 0);
+
+  const handleSendQR = async (guest) => {
+    if (!guest.email) {
+      setEmailStatus({ type: "error", message: `Tamu "${guest.nama}" tidak memiliki alamat email` });
+      setTimeout(() => setEmailStatus(null), 4000);
+      return;
+    }
+    setSendingEmail(true);
+    try {
+      const res = await fetch("/api/send-qr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guest_ids: [guest.id], acara_id: guest.acara_id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.results?.[0]?.status === "sent") {
+        setEmailStatus({ type: "success", message: `QR Code terkirim ke ${guest.email}` });
+      } else {
+        setEmailStatus({ type: "error", message: data.results?.[0]?.error || "Gagal mengirim email" });
+      }
+    } catch {
+      setEmailStatus({ type: "error", message: "Gagal terhubung ke server" });
+    } finally {
+      setSendingEmail(false);
+      setTimeout(() => setEmailStatus(null), 4000);
+    }
+  };
 
   const getQrUrl = (token) => {
     if (typeof window === "undefined") return "";
@@ -357,6 +386,19 @@ export default function GuestTable({ guests, showEvent = false, events = [], onE
             </svg>
             Lihat QR Code
           </button>
+          <button
+            onClick={() => {
+              const g = guests.find((g) => g.id === openMenuId);
+              if (g) handleSendQR(g);
+              setOpenMenuId(null);
+            }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-input/50 transition-colors cursor-pointer"
+          >
+            <svg className="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            Kirim QR via Email
+          </button>
           <div className="border-t border-border my-1.5 mx-3" />
           {onDelete && (
             <button
@@ -433,6 +475,24 @@ export default function GuestTable({ guests, showEvent = false, events = [], onE
             <div className="flex justify-end pt-4">
               <Button type="button" onClick={() => setDetailGuest(null)}>Tutup</Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Status Toast */}
+      {emailStatus && (
+        <div className="fixed bottom-6 right-6 z-[60] animate-in">
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg bg-white ${
+            emailStatus.type === "success" ? "border-success/20" : "border-danger/20"
+          }`}>
+            <svg className={`w-5 h-5 ${emailStatus.type === "success" ? "text-success" : "text-danger"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {emailStatus.type === "success" ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              )}
+            </svg>
+            <p className="text-sm font-medium text-foreground">{emailStatus.message}</p>
           </div>
         </div>
       )}

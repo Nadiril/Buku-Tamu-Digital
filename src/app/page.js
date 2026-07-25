@@ -15,7 +15,18 @@ export default function HomePage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const msg = params.get("message");
+    if (msg) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMessage(msg.replace(/\$/g, ""));
+      window.history.replaceState({}, "", "/");
+    }
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -27,8 +38,7 @@ export default function HomePage() {
           .single()
           .then(({ data: profile }) => {
             if (profile?.role === "admin") router.push("/admin/dashboard");
-            else if (profile?.role === "staff") router.push("/staff/dashboard");
-            else router.push("/scanner/events");
+            else router.push("/panitia");
           });
       } else {
         setCheckingSession(false);
@@ -60,10 +70,8 @@ export default function HomePage() {
 
     if (profile?.role === "admin") {
       router.push("/admin/dashboard");
-    } else if (profile?.role === "staff") {
-      router.push("/staff/dashboard");
     } else {
-      router.push("/scanner/events");
+      router.push("/panitia");
     }
   };
 
@@ -106,6 +114,15 @@ export default function HomePage() {
               </button>
             </div>
 
+            {message && (
+              <div className="bg-warning-muted border border-warning/20 rounded-xl px-4 py-3 text-sm text-warning flex items-center gap-2">
+                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                {message}
+              </div>
+            )}
+
             {error && (
               <div className="bg-danger-muted border border-danger/20 rounded-xl px-4 py-3 text-sm text-danger flex items-center gap-2">
                 <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -131,7 +148,7 @@ export default function HomePage() {
           </form>
         </div>
 
-        <p className="text-center text-[11px] text-muted/40 mt-6">v1.0.0 — Buku Tamu Digital Multi Event</p>
+        <p className="text-center text-[11px] text-muted/40 mt-6">v0.4.0 — Buku Tamu Digital Multi Event</p>
       </div>
     </div>
   );

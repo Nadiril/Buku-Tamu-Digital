@@ -21,6 +21,7 @@ export default function GuestsPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [toast, setToast] = useState(null);
+  const [sendingBulkQr, setSendingBulkQr] = useState(false);
   const [newGuest, setNewGuest] = useState({
     nama: "",
     instansi: "",
@@ -87,6 +88,44 @@ export default function GuestsPage() {
     if (deleted) logActivity("delete_guest", `Menghapus tamu "${deleted.nama}"`);
     setConfirmDeleteId(null);
     showToast("Tamu berhasil dihapus!");
+  };
+
+  const handleBulkSendQR = async () => {
+    if (!eventFilter) {
+      showToast("Pilih acara terlebih dahulu!", "error");
+      return;
+    }
+    setSendingBulkQr(true);
+    const eventGuests = guests.filter((g) => g.acara_id === parseInt(eventFilter) && g.email);
+    if (eventGuests.length === 0) {
+      showToast("Tidak ada tamu dengan alamat email di acara ini", "error");
+      setSendingBulkQr(false);
+      return;
+    }
+    try {
+      const res = await fetch("/api/send-qr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          guest_ids: eventGuests.map((g) => g.id),
+          acara_id: parseInt(eventFilter),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const sent = data.results.filter((r) => r.status === "sent").length;
+        const failed = data.results.filter((r) => r.status === "failed").length;
+        const skipped = data.results.filter((r) => r.status === "skipped").length;
+        showToast(`${sent} terkirim, ${failed} gagal, ${skipped} dilewati`);
+        fetchGuests();
+      } else {
+        showToast(data.error || "Gagal mengirim QR massal", "error");
+      }
+    } catch {
+      showToast("Gagal terhubung ke server", "error");
+    } finally {
+      setSendingBulkQr(false);
+    }
   };
 
   const handleAddGuest = (e) => {
@@ -280,6 +319,15 @@ export default function GuestsPage() {
         subtitle="Kelola semua data tamu"
         actions={
           <div className="flex items-center gap-2">
+            {eventFilter && (
+              <Button onClick={handleBulkSendQR} disabled={sendingBulkQr} variant="secondary" icon={
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              }>
+                {sendingBulkQr ? "Mengirim..." : "Kirim QR Massal"}
+              </Button>
+            )}
             <Button onClick={() => setShowImportModal(true)} variant="secondary" icon={
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
