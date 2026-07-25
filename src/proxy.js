@@ -45,7 +45,18 @@ export default async function proxy(request) {
   } catch (error) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
-    return NextResponse.redirect(url);
+    const response = NextResponse.redirect(url);
+    const supabaseCookies = [
+      "sb-access-token",
+      "sb-refresh-token",
+      "supabase-auth-token",
+    ];
+    for (const name of request.cookies.getAll()) {
+      if (name.name.startsWith("sb-") || name.name.startsWith("supabase-")) {
+        response.cookies.set(name.name, "", { maxAge: 0, path: "/" });
+      }
+    }
+    return response;
   }
 }
 
