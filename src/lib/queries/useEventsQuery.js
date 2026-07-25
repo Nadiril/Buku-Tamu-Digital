@@ -48,6 +48,8 @@ export function useEventsQuery() {
 }
 
 export function useEventMutations() {
+  const queryClient = useQueryClient();
+
   const addMutation = useMutation({
     mutationFn: async (event) => {
       const res = await fetch('/api/events', {
@@ -57,6 +59,9 @@ export function useEventMutations() {
       });
       if (!res.ok) throw new Error('Gagal membuat acara');
       return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: eventsKey() });
     },
   });
 
@@ -70,6 +75,12 @@ export function useEventMutations() {
       if (!res.ok) throw new Error('Gagal mengupdate acara');
       return res.json();
     },
+    onSuccess: (data) => {
+      queryClient.setQueryData(eventsKey(), (old) => {
+        if (!old) return old;
+        return old.map((e) => (e.id === data.id ? { ...e, ...data } : e));
+      });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -77,6 +88,12 @@ export function useEventMutations() {
       const res = await fetch(`/api/events/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Gagal menghapus acara');
       return true;
+    },
+    onSuccess: (_data, id) => {
+      queryClient.setQueryData(eventsKey(), (old) => {
+        if (!old) return old;
+        return old.filter((e) => e.id !== id);
+      });
     },
   });
 

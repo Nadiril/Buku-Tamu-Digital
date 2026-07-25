@@ -60,6 +60,9 @@ export function useGuestMutations() {
       if (!res.ok) throw new Error('Gagal menambah tamu');
       return res.json();
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: guestsKey() });
+    },
   });
 
   const updateMutation = useMutation({
@@ -72,6 +75,12 @@ export function useGuestMutations() {
       if (!res.ok) throw new Error('Gagal mengupdate tamu');
       return res.json();
     },
+    onSuccess: (data) => {
+      queryClient.setQueryData(guestsKey(), (old) => {
+        if (!old) return old;
+        return old.map((g) => (g.id === data.id ? { ...g, ...data } : g));
+      });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -79,6 +88,12 @@ export function useGuestMutations() {
       const res = await fetch(`/api/guests/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Gagal menghapus tamu');
       return true;
+    },
+    onSuccess: (_data, id) => {
+      queryClient.setQueryData(guestsKey(), (old) => {
+        if (!old) return old;
+        return old.filter((g) => g.id !== id);
+      });
     },
   });
 

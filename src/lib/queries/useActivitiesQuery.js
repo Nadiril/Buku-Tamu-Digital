@@ -53,6 +53,11 @@ export function useLogActivity() {
       if (!res.ok) throw new Error('Gagal mencatat aktivitas');
       return res.json();
     },
-    onSuccess: () => {},
+    onSuccess: (data) => {
+      queryClient.setQueryData(activitiesKey(50), (old) => {
+        if (!old) return old;
+        return [data, ...old].slice(0, 50);
+      });
+    },
   });
 }
