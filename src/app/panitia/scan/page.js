@@ -2,10 +2,11 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Scanner, useDevices } from "@yudiel/react-qr-scanner";
-import { useGuests } from "@/lib/GuestContext";
-import { useEvents } from "@/lib/EventContext";
-import { useActivity } from "@/lib/ActivityContext";
+import { useGuestsQuery, useGuestMutations, guestsKey } from "@/lib/queries/useGuestsQuery";
+import { useEventsQuery } from "@/lib/queries/useEventsQuery";
+import { useLogActivity } from "@/lib/queries/useActivitiesQuery";
 import {
   QrCode,
   User,
@@ -33,10 +34,11 @@ function ScanContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const eventId = searchParams.get("eventId");
-  const { events } = useEvents();
+  const queryClient = useQueryClient();
+  const { data: events = [] } = useEventsQuery();
   const selectedEvent = events.find((e) => e.id === parseInt(eventId));
-  const { guests, loaded: guestsLoaded, setGuests, fetchGuests } = useGuests();
-  const { logActivity } = useActivity();
+  const { data: guests = [], isLoading: guestsLoaded } = useGuestsQuery();
+  const { mutateAsync: logActivity } = useLogActivity();
 
   const [scanning, setScanning] = useState(true);
   const [scannedGuest, setScannedGuest] = useState(null);
@@ -80,15 +82,14 @@ function ScanContent() {
       const data = await res.json();
       console.timeEnd("scan:request");
       if (data.success) {
-        setGuests((prev) => prev.map((g) =>
+        queryClient.setQueryData(guestsKey(), (prev = []) => prev.map((g) =>
           g.id === scannedGuest.id
             ? { ...g, status_kehadiran: data.status, waktu_kedatangan: data.guest?.waktu_kedatangan || new Date().toISOString() }
             : g
         ));
-        fetchGuests();
         setScannedGuest((prev) => ({ ...prev, status_kehadiran: data.status }));
         setSubmitted(true);
-        logActivity("scan_guest", `Scan kehadiran "${scannedGuest.nama}" di "${selectedEvent?.nama_acara}"`);
+        logActivity({ action: "scan_guest", detail: `Scan kehadiran "${scannedGuest.nama}" di "${selectedEvent?.nama_acara}"` });
         showToast(
           data.status === "hadir" ? "Kehadiran tepat waktu!" : "Tamu tercatat terlambat."
         );

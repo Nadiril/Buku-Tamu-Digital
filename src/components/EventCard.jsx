@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useGuests } from "@/lib/GuestContext";
+import { useGuestsQuery } from "@/lib/queries/useGuestsQuery";
 import { useState, useEffect, useRef } from "react";
 
 export default function EventCard({ event, onEdit, onDelete, onStatusChange }) {
   const router = useRouter();
-  const { guests } = useGuests();
+  const { data: guests = [] } = useGuestsQuery();
   const totalTamu = guests.filter((g) => g.acara_id === event.id).length;
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const statusRef = useRef(null);

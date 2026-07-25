@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useEvents } from "@/lib/EventContext";
-import { useGuests } from "@/lib/GuestContext";
+import { useEventsQuery } from "@/lib/queries/useEventsQuery";
+import { useGuestsQuery } from "@/lib/queries/useGuestsQuery";
 import {
   Calendar,
   MapPin,
@@ -35,8 +35,8 @@ const statusStyles = {
 
 export default function PanitiaEventsPage() {
   const router = useRouter();
-  const { events } = useEvents();
-  const { guests } = useGuests();
+  const { data: events = [] } = useEventsQuery();
+  const { data: guests = [] } = useGuestsQuery();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 

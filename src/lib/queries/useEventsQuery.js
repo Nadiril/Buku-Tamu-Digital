@@ -1,0 +1,97 @@
+'use client';
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
+import { useRealtimeSubscription } from '@/lib/realtime/useRealtimeSubscription';
+
+export function eventsKey() {
+  return ['events'];
+}
+
+async function fetchEvents() {
+  const res = await fetch('/api/events');
+  if (!res.ok) throw new Error('Gagal memuat data acara');
+  return res.json();
+}
+
+export function useEventsQuery() {
+  const queryClient = useQueryClient();
+
+  const result = useQuery({
+    queryKey: eventsKey(),
+    queryFn: fetchEvents,
+  });
+
+  useRealtimeSubscription(
+    'events',
+    useCallback(
+      (payload) => {
+        queryClient.setQueryData(eventsKey(), (old) => {
+          if (!old) return old;
+          switch (payload.eventType) {
+            case 'INSERT':
+              return [payload.new, ...old];
+            case 'UPDATE':
+              return old.map((e) => (e.id === payload.new.id ? { ...e, ...payload.new } : e));
+            case 'DELETE':
+              return old.filter((e) => e.id !== payload.old.id);
+            default:
+              return old;
+          }
+        });
+      },
+      [queryClient]
+    )
+  );
+
+  return result;
+}
+
+export function useEventMutations() {
+  const addMutation = useMutation({
+    mutationFn: async (event) => {
+      const res = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(event),
+      });
+      if (!res.ok) throw new Error('Gagal membuat acara');
+      return res.json();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, ...updates }) => {
+      const res = await fetch(`/api/events/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error('Gagal mengupdate acara');
+      return res.json();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id) => {
+      const res = await fetch(`/api/events/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Gagal menghapus acara');
+      return true;
+    },
+  });
+
+  const addEvent = async (event) => {
+    return await addMutation.mutateAsync(event);
+  };
+
+  const updateEvent = async (id, updates) => {
+    return await updateMutation.mutateAsync({ id, ...updates });
+  };
+
+  const deleteEvent = async (id) => {
+    await deleteMutation.mutateAsync(id);
+    return true;
+  };
+
+  return { addEvent, updateEvent, deleteEvent, addMutation, updateMutation, deleteMutation };
+}

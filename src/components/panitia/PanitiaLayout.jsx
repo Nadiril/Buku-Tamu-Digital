@@ -7,12 +7,12 @@ import PanitiaSidebar from "./PanitiaSidebar";
 import PanitiaNavbar from "./PanitiaNavbar";
 import Providers from "@/app/providers";
 import SessionTimeout from "@/components/SessionTimeout";
-import { useProfile } from "@/lib/ProfileContext";
+import { useProfileQuery } from "@/lib/queries/useProfileQuery";
 
 function PanitiaLayoutInner({ children }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile, loaded } = useProfile();
+  const { data: profile, isLoading: loaded } = useProfileQuery();
   const panitiaName = profile?.display_name || "Panitia";
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);

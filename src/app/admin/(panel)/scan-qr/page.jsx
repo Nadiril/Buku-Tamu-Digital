@@ -6,19 +6,20 @@ import Navbar from "@/components/Navbar";
 import QRScanner from "@/components/scanner/QRScanner";
 import Button from "@/components/Button";
 import Toast from "@/components/Toast";
-import { useGuests } from "@/lib/GuestContext";
-import { useEvents } from "@/lib/EventContext";
-import { useActivity } from "@/lib/ActivityContext";
+import { useGuestsQuery, useGuestMutations } from "@/lib/queries/useGuestsQuery";
+import { useEventsQuery } from "@/lib/queries/useEventsQuery";
+import { useLogActivity } from "@/lib/queries/useActivitiesQuery";
 import { UserRound, Clock, CheckCircle, Building2, Phone, Calendar, User, Send, ArrowLeft, QrCode } from "lucide-react";
 
 function ScanQRContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const eventId = searchParams.get("eventId");
-  const { events: allEvents } = useEvents();
+  const { data: allEvents = [] } = useEventsQuery();
   const selectedEvent = allEvents.find((e) => e.id === parseInt(eventId));
-  const { guests, updateGuest } = useGuests();
-  const { logActivity } = useActivity();
+  const { data: guests = [] } = useGuestsQuery();
+  const { updateGuest } = useGuestMutations();
+  const { mutateAsync: logActivity } = useLogActivity();
 
   const [scannedGuest, setScannedGuest] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -58,7 +59,7 @@ function ScanQRContent() {
           { id: Date.now(), nama: scannedGuest.nama, instansi: scannedGuest.instansi, no_hp: scannedGuest.no_hp, kategori_tamu: scannedGuest.kategori_tamu, event: selectedEvent?.nama_acara || allEvents.find((e) => e.id === scannedGuest.acara_id)?.nama_acara, status: data.status, time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) },
           ...prev,
         ]);
-        logActivity("scan_guest", `Scan kehadiran "${scannedGuest.nama}"` + (selectedEvent ? ` di "${selectedEvent.nama_acara}"` : ""));
+        logActivity({ action: "scan_guest", detail: `Scan kehadiran "${scannedGuest.nama}"` + (selectedEvent ? ` di "${selectedEvent.nama_acara}"` : "") });
         showToast(
           data.status === "hadir" ? "Kehadiran tepat waktu!" :
           data.status === "terlambat" ? "Tamu tercatat terlambat." :

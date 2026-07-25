@@ -4,8 +4,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import GuestTable from "@/components/GuestTable";
-import { useEvents } from "@/lib/EventContext";
-import { useGuests } from "@/lib/GuestContext";
+import { useEventsQuery } from "@/lib/queries/useEventsQuery";
+import { useGuestsQuery } from "@/lib/queries/useGuestsQuery";
 
 const statusMap = {
   registrasi_dibuka: { badge: "bg-success-muted text-success border border-success/20", dot: "bg-success pulse-dot", label: "Registrasi Dibuka" },
@@ -17,8 +17,8 @@ const fmtDate = (d) => new Date(d).toLocaleDateString("id-ID", { weekday: "long"
 
 export default function EventDetailPage() {
   const { id } = useParams();
-  const { events } = useEvents();
-  const { guests } = useGuests();
+  const { data: events = [] } = useEventsQuery();
+  const { data: guests = [] } = useGuestsQuery();
   const event = events.find((e) => e.id === parseInt(id));
 
   if (!event) {

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useGuests } from "@/lib/GuestContext";
-import { useEvents } from "@/lib/EventContext";
+import { useGuestsQuery } from "@/lib/queries/useGuestsQuery";
+import { useEventsQuery } from "@/lib/queries/useEventsQuery";
 import {
   Search,
   Users,
@@ -33,8 +33,8 @@ const kategoriMap = {
 const ITEMS_PER_PAGE = 15;
 
 export default function HistoryPage() {
-  const { guests } = useGuests();
-  const { events } = useEvents();
+  const { data: guests = [] } = useGuestsQuery();
+  const { data: events = [] } = useEventsQuery();
   const [search, setSearch] = useState("");
   const [eventFilter, setEventFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");

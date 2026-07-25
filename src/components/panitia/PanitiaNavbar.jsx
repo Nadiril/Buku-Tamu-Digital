@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { Bell, CalendarRange, X } from "lucide-react";
-import { useEvents } from "@/lib/EventContext";
+import { useEventsQuery } from "@/lib/queries/useEventsQuery";
 
 const pageTitleMap = {
   "/panitia": "Dashboard",
@@ -27,7 +27,7 @@ export default function PanitiaNavbar({
   onToggleMobile,
 }) {
   const pathname = usePathname() ?? "";
-  const { events } = useEvents();
+  const { data: events = [] } = useEventsQuery();
 
   const activeEvent = events?.find((e) => e.status === "registrasi_dibuka");
   const title = pageTitleMap[pathname] || "Dashboard";

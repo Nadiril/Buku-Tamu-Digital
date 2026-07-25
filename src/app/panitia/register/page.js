@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useMemo } from "react";
-import { useEvents } from "@/lib/EventContext";
-import { useGuests } from "@/lib/GuestContext";
-import { useActivity } from "@/lib/ActivityContext";
+import { useEventsQuery } from "@/lib/queries/useEventsQuery";
+import { useGuestsQuery, useGuestMutations } from "@/lib/queries/useGuestsQuery";
+import { useLogActivity } from "@/lib/queries/useActivitiesQuery";
 import {
   User,
   Building2,
@@ -31,9 +31,10 @@ function RegisterContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const selectedEventId = searchParams.get("eventId");
-  const { events } = useEvents();
-  const { guests, addGuest } = useGuests();
-  const { logActivity } = useActivity();
+  const { data: events = [] } = useEventsQuery();
+  const { data: guests = [] } = useGuestsQuery();
+  const { addGuest } = useGuestMutations();
+  const { mutateAsync: logActivity } = useLogActivity();
 
   const [eventId, setEventId] = useState(selectedEventId || "");
   const [form, setForm] = useState({
@@ -82,7 +83,7 @@ function RegisterContent() {
         kategori_tamu: form.kategori_tamu,
       });
       if (result) {
-        logActivity("create_guest", `Registrasi tamu "${form.nama.trim()}" di "${selectedEvent?.nama_acara}"`);
+        logActivity({ action: "create_guest", detail: `Registrasi tamu "${form.nama.trim()}" di "${selectedEvent?.nama_acara}"` });
         setToast({ id: Date.now(), message: "Tamu berhasil diregistrasi!", type: "success" });
         setForm({ nama: "", instansi: "", no_hp: "", email: "", kategori_tamu: "reguler" });
       } else {

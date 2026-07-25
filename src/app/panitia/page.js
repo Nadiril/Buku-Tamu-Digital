@@ -2,9 +2,9 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useEvents } from "@/lib/EventContext";
-import { useGuests } from "@/lib/GuestContext";
-import { useActivity } from "@/lib/ActivityContext";
+import { useEventsQuery } from "@/lib/queries/useEventsQuery";
+import { useGuestsQuery } from "@/lib/queries/useGuestsQuery";
+import { useActivitiesQuery } from "@/lib/queries/useActivitiesQuery";
 import {
   Calendar,
   Users,
@@ -18,9 +18,9 @@ import {
 
 export default function PanitiaDashboardPage() {
   const router = useRouter();
-  const { events } = useEvents();
-  const { guests } = useGuests();
-  const { activities } = useActivity();
+  const { data: events = [] } = useEventsQuery();
+  const { data: guests = [] } = useGuestsQuery();
+  const { data: activities = [] } = useActivitiesQuery();
   const [selectedEventId, setSelectedEventId] = useState("all");
 
   const stats = useMemo(() => {

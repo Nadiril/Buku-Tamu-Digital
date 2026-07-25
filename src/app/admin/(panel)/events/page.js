@@ -6,8 +6,8 @@ import EventCard from "@/components/EventCard";
 import Button from "@/components/Button";
 import Input from "@/components/Input";
 import Toast from "@/components/Toast";
-import { useEvents } from "@/lib/EventContext";
-import { useActivity } from "@/lib/ActivityContext";
+import { useEventsQuery, useEventMutations } from "@/lib/queries/useEventsQuery";
+import { useLogActivity } from "@/lib/queries/useActivitiesQuery";
 
 const defaultForm = {
   nama_acara: "",
@@ -20,8 +20,9 @@ const defaultForm = {
 };
 
 export default function EventsPage() {
-  const { events, addEvent, updateEvent, deleteEvent } = useEvents();
-  const { logActivity } = useActivity();
+  const { data: events = [] } = useEventsQuery();
+  const { addEvent, updateEvent, deleteEvent } = useEventMutations();
+  const { mutateAsync: logActivity } = useLogActivity();
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
@@ -56,7 +57,7 @@ export default function EventsPage() {
       status: "akan_datang",
     };
     await addEvent(event);
-    logActivity("create_event", `Membuat acara "${event.nama_acara}"`);
+    logActivity({ action: "create_event", detail: `Membuat acara "${event.nama_acara}"` });
     resetForm();
     showToast("Acara berhasil dibuat!");
   };
@@ -86,7 +87,7 @@ export default function EventsPage() {
       jam_selesai: newEvent.jam_selesai || "17:00",
       grace_period_minutes: parseInt(newEvent.grace_period_minutes) || 30,
     });
-    logActivity("update_event", `Mengedit acara "${newEvent.nama_acara}"`);
+    logActivity({ action: "update_event", detail: `Mengedit acara "${newEvent.nama_acara}"` });
     resetForm();
     showToast("Acara berhasil diperbarui!");
   };
@@ -98,7 +99,7 @@ export default function EventsPage() {
   const confirmDelete = async () => {
     const deleted = events.find((e) => e.id === confirmDeleteId);
     await deleteEvent(confirmDeleteId);
-    if (deleted) logActivity("delete_event", `Menghapus acara "${deleted.nama_acara}"`);
+    if (deleted) logActivity({ action: "delete_event", detail: `Menghapus acara "${deleted.nama_acara}"` });
     setConfirmDeleteId(null);
     showToast("Acara berhasil dihapus!");
   };
@@ -128,7 +129,7 @@ export default function EventsPage() {
       showToast("Gagal mengubah status acara. Silakan coba lagi.", "error");
       return;
     }
-    logActivity("update_status", `Mengubah status "${event.nama_acara}" menjadi "${statusLabels[newStatus]}"`);
+    logActivity({ action: "update_status", detail: `Mengubah status "${event.nama_acara}" menjadi "${statusLabels[newStatus]}"` });
     showToast("Status acara berhasil diperbarui!");
   };
 

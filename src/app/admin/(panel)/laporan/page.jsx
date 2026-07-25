@@ -4,9 +4,9 @@ import { useState } from "react";
 import * as XLSX from "xlsx";
 import Navbar from "@/components/Navbar";
 import Button from "@/components/Button";
-import { useGuests } from "@/lib/GuestContext";
-import { useEvents } from "@/lib/EventContext";
-import { useActivity } from "@/lib/ActivityContext";
+import { useGuestsQuery } from "@/lib/queries/useGuestsQuery";
+import { useEventsQuery } from "@/lib/queries/useEventsQuery";
+import { useLogActivity } from "@/lib/queries/useActivitiesQuery";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { FileDown, FileSpreadsheet, Users, CheckCircle, XCircle, AlertTriangle, TrendingUp } from "lucide-react";
 
@@ -18,9 +18,9 @@ const statusLabel = {
 
 export default function LaporanPage() {
   const [eventFilter, setEventFilter] = useState("");
-  const { guests } = useGuests();
-  const { events } = useEvents();
-  const { logActivity } = useActivity();
+  const { data: guests = [] } = useGuestsQuery();
+  const { data: events = [] } = useEventsQuery();
+  const { mutateAsync: logActivity } = useLogActivity();
 
   const getEventName = (acara_id) => {
     const event = events.find((e) => e.id === acara_id);
@@ -93,7 +93,7 @@ export default function LaporanPage() {
 
   const handleExportCSV = () => {
     if (exportData.length === 0) return;
-    logActivity("export_laporan", "Mengexport laporan CSV" + (eventFilter ? ` (filter acara)` : " (semua acara)"));
+    logActivity({ action: "export_laporan", detail: "Mengexport laporan CSV" + (eventFilter ? ` (filter acara)` : " (semua acara)") });
     const headers = Object.keys(exportData[0]);
     const csvRows = [
       headers.join(","),
@@ -112,7 +112,7 @@ export default function LaporanPage() {
 
   const handleExportExcel = () => {
     if (exportData.length === 0) return;
-    logActivity("export_laporan", "Mengexport laporan Excel" + (eventFilter ? ` (filter acara)` : " (semua acara)"));
+    logActivity({ action: "export_laporan", detail: "Mengexport laporan Excel" + (eventFilter ? ` (filter acara)` : " (semua acara)") });
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Laporan Tamu");

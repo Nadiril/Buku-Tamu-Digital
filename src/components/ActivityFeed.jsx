@@ -1,6 +1,6 @@
 "use client";
 
-import { useActivity } from "@/lib/ActivityContext";
+import { useActivitiesQuery } from "@/lib/queries/useActivitiesQuery";
 import {
   LogIn,
   CalendarPlus,
@@ -30,7 +30,7 @@ const actionConfig = {
 };
 
 export default function ActivityFeed({ limit = 10 }) {
-  const { activities } = useActivity();
+  const { data: activities = [] } = useActivitiesQuery();
 
   const recent = activities.slice(0, limit);
 

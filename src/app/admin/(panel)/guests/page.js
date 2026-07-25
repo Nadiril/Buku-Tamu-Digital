@@ -1,20 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Navbar from "@/components/Navbar";
 import GuestTable from "@/components/GuestTable";
 import Button from "@/components/Button";
 import Input from "@/components/Input";
 import Toast from "@/components/Toast";
-import { useGuests } from "@/lib/GuestContext";
-import { useEvents } from "@/lib/EventContext";
-import { useActivity } from "@/lib/ActivityContext";
+import { useGuestsQuery, useGuestMutations, guestsKey } from "@/lib/queries/useGuestsQuery";
+import { useEventsQuery } from "@/lib/queries/useEventsQuery";
+import { useLogActivity } from "@/lib/queries/useActivitiesQuery";
 import { generateToken } from "@/lib/token";
 
 export default function GuestsPage() {
-  const { guests, addGuest, updateGuest, deleteGuest, fetchGuests } = useGuests();
-  const { events } = useEvents();
-  const { logActivity } = useActivity();
+  const queryClient = useQueryClient();
+  const { data: guests = [], isLoading } = useGuestsQuery();
+  const { data: events = [] } = useEventsQuery();
+  const { addGuest, updateGuest, deleteGuest } = useGuestMutations();
+  const { mutateAsync: logActivity } = useLogActivity();
+  const fetchGuests = useCallback(() => queryClient.invalidateQueries({ queryKey: guestsKey() }), [queryClient]);
   const [eventFilter, setEventFilter] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingGuest, setEditingGuest] = useState(null);
@@ -71,7 +75,7 @@ export default function GuestsPage() {
       kategori_tamu: newGuest.kategori_tamu,
       acara_id: acaraId,
     });
-    logActivity("update_guest", `Mengedit tamu "${newGuest.nama}"`);
+    logActivity({ action: "update_guest", detail: `Mengedit tamu "${newGuest.nama}"` });
     setShowModal(false);
     setEditingGuest(null);
     setNewGuest({ nama: "", instansi: "", no_hp: "", kategori_tamu: "reguler", acara_id: "" });
@@ -85,7 +89,7 @@ export default function GuestsPage() {
   const confirmDelete = () => {
     const deleted = guests.find((g) => g.id === confirmDeleteId);
     deleteGuest(confirmDeleteId);
-    if (deleted) logActivity("delete_guest", `Menghapus tamu "${deleted.nama}"`);
+    if (deleted) logActivity({ action: "delete_guest", detail: `Menghapus tamu "${deleted.nama}"` });
     setConfirmDeleteId(null);
     showToast("Tamu berhasil dihapus!");
   };
@@ -147,7 +151,7 @@ export default function GuestsPage() {
       qr_token: generateToken(),
     };
     addGuest(guest);
-    logActivity("create_guest", `Menambah tamu "${guest.nama}"`);
+    logActivity({ action: "create_guest", detail: `Menambah tamu "${guest.nama}"` });
     setShowModal(false);
     setNewGuest({ nama: "", instansi: "", no_hp: "", kategori_tamu: "reguler", acara_id: "" });
     showToast("Tamu berhasil ditambahkan!");
@@ -290,7 +294,7 @@ export default function GuestsPage() {
       }
 
       await fetchGuests();
-      logActivity("import_guest", `Mengimpor ${data.count} tamu dari CSV`);
+      logActivity({ action: "import_guest", detail: `Mengimpor ${data.count} tamu dari CSV` });
       setShowImportModal(false);
       setImportFile(null);
       setImportPreview([]);

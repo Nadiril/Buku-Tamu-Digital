@@ -4,8 +4,10 @@ import Navbar from "@/components/Navbar";
 import StatCard from "@/components/StatCard";
 import EventCard from "@/components/EventCard";
 import ActivityFeed from "@/components/ActivityFeed";
-import { useGuests } from "@/lib/GuestContext";
-import { useEvents } from "@/lib/EventContext";
+import { useGuestsQuery } from "@/lib/queries/useGuestsQuery";
+import { useEventsQuery } from "@/lib/queries/useEventsQuery";
+import { useActivitiesQuery } from "@/lib/queries/useActivitiesQuery";
+import { useStatsQuery } from "@/lib/queries/useStatsQuery";
 
 function getWibDayBounds(date = new Date()) {
   const wibDateStr = new Date(date.getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10);
@@ -15,8 +17,10 @@ function getWibDayBounds(date = new Date()) {
 }
 
 export default function DashboardPage() {
-  const { guests } = useGuests();
-  const { events } = useEvents();
+  const { data: guests = [] } = useGuestsQuery();
+  const { data: events = [] } = useEventsQuery();
+  const { data: stats } = useStatsQuery();
+
   const totalEvents = events.length;
   const totalGuests = guests.length;
 
@@ -37,7 +41,6 @@ export default function DashboardPage() {
       />
 
       <div className="flex-1 p-6 space-y-8">
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="Total Acara"
@@ -53,7 +56,6 @@ export default function DashboardPage() {
             title="Total Tamu"
             value={totalGuests}
             color="success"
-
             icon={
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -82,7 +84,6 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* Recent Events */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -102,7 +103,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Activity Log */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -118,7 +118,6 @@ export default function DashboardPage() {
             <ActivityFeed limit={10} />
           </div>
         </div>
-
       </div>
     </>
   );

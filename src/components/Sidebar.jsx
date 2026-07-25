@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { QrCode, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { useProfile } from "@/lib/ProfileContext";
+import { useProfileQuery } from "@/lib/queries/useProfileQuery";
 
 const navItems = [
   {
@@ -66,7 +66,7 @@ export default function Sidebar() {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const { profile } = useProfile();
+  const { data: profile } = useProfileQuery();
   const supabase = createClient();
 
   const displayName = profile?.display_name || "Admin";

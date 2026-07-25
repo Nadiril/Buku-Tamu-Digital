@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useProfile } from "@/lib/ProfileContext";
+import { useProfileQuery, useUpdateProfile } from "@/lib/queries/useProfileQuery";
 import {
   User,
   Mail,
@@ -21,8 +21,8 @@ import {
 export default function ProfilePage() {
   const router = useRouter();
   const supabase = createClient();
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { data: profile, isLoading: loading } = useProfileQuery();
+  const { mutateAsync: updateProfile } = useUpdateProfile();
   const [passwordNew, setPasswordNew] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [showNew, setShowNew] = useState(false);
@@ -31,22 +31,6 @@ export default function ProfilePage() {
   const [toast, setToast] = useState(null);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
-  const { updateProfile } = useProfile();
-
-  useEffect(() => {
-    const loadProfile = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return router.push("/");
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", session.user.id)
-        .single();
-      if (data) setProfile({ ...data, email: session.user.email });
-      setLoading(false);
-    };
-    loadProfile();
-  }, [supabase, router]);
 
   const handleSaveName = async () => {
     const trimmed = nameInput.trim();
