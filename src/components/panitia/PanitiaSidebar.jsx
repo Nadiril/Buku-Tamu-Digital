@@ -24,7 +24,7 @@ const navItems = [
   { label: "Profil", href: "/panitia/profile", icon: User },
 ];
 
-export default function PanitiaSidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile }) {
+export default function PanitiaSidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile, mounted = false }) {
   const pathname = usePathname() ?? "";
   const router = useRouter();
   const supabase = createClient();
@@ -51,7 +51,7 @@ export default function PanitiaSidebar({ collapsed, onToggleCollapse, mobileOpen
 
   const sidebarContent = (
     <aside
-      className={`flex flex-col h-full ${sidebarWidth} bg-sidebar border-r border-border transition-all duration-300 ease-in-out`}
+      className={`flex flex-col h-full ${sidebarWidth} bg-sidebar border-r border-border ${mounted ? "transition-all duration-300 ease-in-out" : ""}`}
     >
       {/* Logo Section */}
       <div className={`flex items-center border-b border-border ${collapsed ? "justify-center px-0 py-5" : "px-5 py-4"}`}>
@@ -141,7 +141,7 @@ export default function PanitiaSidebar({ collapsed, onToggleCollapse, mobileOpen
   return (
     <>
       {/* Desktop Sidebar */}
-      <div className={`hidden lg:block fixed left-0 top-0 h-screen z-40 transition-all duration-300 ${sidebarWidth}`}>
+      <div className={`hidden lg:block fixed left-0 top-0 h-screen z-40 ${mounted ? "transition-all duration-300" : ""} ${sidebarWidth}`}>
         {sidebarContent}
       </div>
 

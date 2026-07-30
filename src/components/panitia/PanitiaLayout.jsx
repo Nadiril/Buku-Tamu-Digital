@@ -12,20 +12,21 @@ import { useProfileQuery } from "@/lib/queries/useProfileQuery";
 function PanitiaLayoutInner({ children }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { data: profile, isLoading: loaded } = useProfileQuery();
+  const { data: profile, isLoading } = useProfileQuery();
   const panitiaName = profile?.display_name || "Panitia";
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
   useEffect(() => {
-    if (loaded && !profile) {
+    if (!isLoading && !profile) {
       router.push("/");
     }
-  }, [loaded, profile, router]);
+  }, [isLoading, profile, router]);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
@@ -36,7 +37,11 @@ function PanitiaLayoutInner({ children }) {
     return () => mq.removeEventListener("change", handle);
   }, []);
 
-  if (!loaded) {
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
@@ -51,8 +56,9 @@ function PanitiaLayoutInner({ children }) {
         onToggleCollapse={() => setCollapsed((c) => !c)}
         mobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
+        mounted={mounted}
       />
-      <div className={`transition-all duration-300 ${collapsed ? "lg:ml-[72px]" : "lg:ml-[280px]"}`}>
+      <div className={`${mounted ? "transition-all duration-300" : ""} ${collapsed ? "lg:ml-[72px]" : "lg:ml-[280px]"}`}>
         <PanitiaNavbar
           panitiaName={panitiaName}
           collapsed={collapsed}
