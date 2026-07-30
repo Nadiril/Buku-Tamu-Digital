@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Input from "@/components/Input";
@@ -8,6 +8,18 @@ import Button from "@/components/Button";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 
 export default function HomePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <HomePageContent />
+    </Suspense>
+  );
+}
+
+function HomePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [form, setForm] = useState({ email: "", password: "" });
