@@ -56,14 +56,21 @@ export async function POST(request) {
 
     if (!email || !password || !role) {
       return NextResponse.json(
-        { error: "Email, password, and role are required" },
+        { error: "Email, password, dan role wajib diisi" },
+        { status: 400 }
+      );
+    }
+
+    if (password.length < 8) {
+      return NextResponse.json(
+        { error: "Password minimal 8 karakter" },
         { status: 400 }
       );
     }
 
     if (!["admin", "panitia"].includes(role)) {
       return NextResponse.json(
-        { error: "Invalid role. Must be admin or panitia" },
+        { error: "Role harus admin atau panitia" },
         { status: 400 }
       );
     }
@@ -82,7 +89,7 @@ export async function POST(request) {
       });
 
     if (authError) {
-      return NextResponse.json({ error: authError.message }, { status: 500 });
+      return NextResponse.json({ error: "Gagal membuat pengguna" }, { status: 500 });
     }
 
     return NextResponse.json(

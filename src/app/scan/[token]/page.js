@@ -168,9 +168,11 @@ export default function ScanPage({ params }) {
           </div>
         </div>
 
-        {error && (
-          <div className="bg-danger-muted border border-danger/20 rounded-xl px-4 py-3 text-sm text-danger mb-4">{error}</div>
-        )}
+        <div className="min-h-[52px]" role="status" aria-live="polite">
+          {error && (
+            <div className="bg-danger-muted border border-danger/20 rounded-xl px-4 py-3 text-sm text-danger mb-4">{error}</div>
+          )}
+        </div>
 
         {guest.status_kehadiran === "hadir" || guest.status_kehadiran === "terlambat" ? (
           <div className="flex items-center gap-2 justify-center text-success text-sm mb-4">

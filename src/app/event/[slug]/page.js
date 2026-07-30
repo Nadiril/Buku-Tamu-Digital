@@ -210,9 +210,11 @@ export default function GuestFormPage({ params }) {
         </div>
 
         <div className="glass-card rounded-2xl p-8 glow-accent">
-          {error && (
-            <div className="bg-danger-muted border border-danger/20 rounded-xl px-4 py-3 text-sm text-danger mb-4">{error}</div>
-          )}
+          <div className="min-h-[52px]" role="status" aria-live="polite">
+            {error && (
+              <div className="bg-danger-muted border border-danger/20 rounded-xl px-4 py-3 text-sm text-danger mb-4">{error}</div>
+            )}
+          </div>
           <form onSubmit={handleSubmit} className="space-y-5">
             <Input id="guest-name" label="Nama Lengkap" placeholder="Masukkan nama lengkap Anda" value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} required icon={
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>

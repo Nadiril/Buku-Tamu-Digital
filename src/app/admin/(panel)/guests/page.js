@@ -157,6 +157,12 @@ export default function GuestsPage() {
     showToast("Tamu berhasil ditambahkan!");
   };
 
+  const sanitizeCSV = (value) => {
+    const v = value.trim();
+    if (["=", "+", "-", "@"].includes(v[0])) return "'" + v;
+    return v;
+  };
+
   const parseCSV = (text) => {
     const rows = [];
     let row = [];
@@ -210,7 +216,7 @@ export default function GuestsPage() {
     });
     const results = [];
     for (let i = 1; i < rows.length; i++) {
-      const values = rows[i].map((v) => v.trim());
+      const values = rows[i].map((v) => sanitizeCSV(v));
       if (values.every((v) => v === "")) continue;
       const rowObj = {};
       headers.forEach((h, idx) => {

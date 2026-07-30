@@ -33,12 +33,11 @@ export async function POST(request, { params }) {
 
   if (error) {
     console.error("[scan] RPC error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Gagal memproses scan" }, { status: 500 });
   }
 
   // 3. The function returns a jsonb response with { success, error_code, message, ... }
   if (!data.success) {
-    console.log("[scan] RPC returned:", JSON.stringify(data));
     const statusMap = {
       invalid_qr: 404,
       event_not_found: 404,
@@ -47,10 +46,9 @@ export async function POST(request, { params }) {
       already_registered: 409,
       forbidden: 403,
     };
-    const status = statusMap[data.error_code] || 400;
     return NextResponse.json(
-      { error: data.message, code: data.error_code, guest: data.guest || null },
-      { status },
+      { error: data.message },
+      { status: statusMap[data.error_code] || 400 },
     );
   }
 

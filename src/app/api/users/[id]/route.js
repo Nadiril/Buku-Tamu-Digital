@@ -25,11 +25,14 @@ export async function PUT(request, { params }) {
     const service = await createServiceClient();
 
     if (body.password) {
+      if (body.password.length < 8) {
+        return NextResponse.json({ error: "Password minimal 8 karakter" }, { status: 400 });
+      }
       const { error: pwdError } = await service.auth.admin.updateUserById(id, {
         password: body.password,
       });
       if (pwdError) {
-        return NextResponse.json({ error: pwdError.message }, { status: 500 });
+        return NextResponse.json({ error: "Gagal mengubah password" }, { status: 500 });
       }
     }
 
@@ -53,7 +56,7 @@ export async function PUT(request, { params }) {
 
     return NextResponse.json({ success: true });
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
   }
 }
 
@@ -87,7 +90,7 @@ export async function DELETE(request, { params }) {
     const service = await createServiceClient();
     const { error } = await service.auth.admin.deleteUser(id);
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "Gagal menghapus pengguna" }, { status: 500 });
     }
     return NextResponse.json({ success: true });
   } catch {

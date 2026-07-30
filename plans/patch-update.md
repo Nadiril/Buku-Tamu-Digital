@@ -144,3 +144,129 @@ npm run build   # ✓ Compiled successfully
                 # ✓ TypeScript passed
                 # ✓ All 29 pages generated
 ```
+
+
+
+---
+
+# Patch Update — v0.4.0 → v0.5.0
+
+## Version
+
+**0.5.0**
+
+---
+
+## Tasks Completed
+
+### 1. Security Audit & Fixes — 25 files changed
+
+Complete security audit covering SQL injection, auth bypass, rate limiting, input validation, access control, CSRF, CSP, and information disclosure.
+
+#### Critical Fixes
+
+| # | Issue | Fix |
+|---|-------|-----|
+| C1 | Public endpoints used `SUPABASE_SERVICE_ROLE_KEY` → bypassed all RLS | Added `createPublicClient()` with **anon key** for all public GET/read endpoints. Only service_role kept for write endpoints that need it (guest insert, email). Added RLS policies `to anon` for `events`, `profiles`, `guests`. |
+| C2 | Panitia could directly update `status_kehadiran` via `PUT /api/guests/[id]` using service_role key — bypassed timing validation | Removed the panitia bypass path entirely. `PUT /api/guests/[id]` is now **admin-only**. |
+| C3 | No rate limiting on login — unlimited brute force | Added **rate limit 10 req/min/IP** on `POST /api/auth/login`. |
+| C4 | Client-side login (`supabase.auth.signInWithPassword()`) bypassed server-side controls | Moved login to server-side: `page.js` now calls `POST /api/auth/login` instead of direct Supabase client call. |
+| C5 | Email enumeration via `/api/public/check-email` with service_role | Switched to anon key + rate limit 10 req/min/IP. |
+
+#### High Severity Fixes
+
+| # | Issue | Fix |
+|---|-------|-----|
+| H1 | 5 API routes missing role checks — panitia could access admin data | Added role check to: `GET /api/events`, `GET/POST /api/guests`, `GET /api/events/stats`, `GET /api/activities`, `POST /api/activities` |
+| H2 | Logout returned success even when `signOut()` failed | Added error handling — returns 500 if signOut fails |
+| H3 | Zero server-side input validation (no length limits, no type checks) | Added `sanitize()` with length limits + type checks on all POST/PUT handlers |
+| H4 | CSV Formula Injection — `=DANGER()` cells stored verbatim | Added CSV formula protection: prefix `'` to cells starting with `=`, `+`, `-`, `@` |
+| H5 | Weak password policy (min 6 chars, no server validation) | Raised to **min 8 chars**, validated both client + server |
+| H6 | QR token leaked in API responses and UI | Strip `qr_token` from API responses; show link instead of raw token in UI |
+| H7 | Raw error messages leaked DB/SMTP details (26 locations) | All errors replaced with generic messages |
+
+#### Medium Severity Fixes
+
+| # | Issue | Fix |
+|---|-------|-----|
+| M1 | Rate limiter used spoofable `x-forwarded-for` header | Parse first IP from `x-forwarded-for`, fallback to `x-real-ip` |
+| M2 | In-memory rate limiter caused memory leak (Map grew unbounded) | Added `setInterval` cleanup of stale entries |
+| M3 | No rate limiting on authenticated scan endpoint | Error messages sanitized |
+| M4 | No CSP/X-Frame-Options/X-Content-Type-Options headers | Added security headers in `next.config.mjs` |
+| M5 | Activities POST accepted any action string from any auth user | Whitelisted allowed actions; requires admin/panitia role |
+| M6 | Grace period 0 → 30 bug (`Number(0) || 30` evaluates to 30) | Changed to `>= 0` check with nullish coalescing |
+| M7 | Slug could be manually set via event update API | Removed `slug` from allowed update fields; always auto-generated |
+| M8 | QR token exposed in guest detail API response | SELECT limited to non-sensitive fields |
+| M9 | Token generator had modulo bias (char `a-d` 14% more likely) | Replaced with `crypto.randomUUID()` |
+
+---
+
+## Files Changed (since v0.4.0)
+
+### Modified
+| File | Change |
+|------|--------|
+| `src/lib/supabase/server.js` | Added `createPublicClient()` (anon key) |
+| `src/lib/supabase/client.js` | Unchanged |
+| `src/lib/token.js` | Replaced modulo-biased generator with `randomUUID()` |
+| `src/lib/realtime/manager.js` | Suppress non-critical transport failure logs |
+| `src/lib/event-status.js` | Unchanged |
+| `src/lib/email.js` | Unchanged |
+| `src/lib/query-client.js` | Unchanged |
+| `src/app/page.js` | Login → server-side API; version bump to v0.5.0 |
+| `src/app/api/auth/login/route.js` | Rate limit + input validation |
+| `src/app/api/auth/logout/route.js` | Error handling on signOut |
+| `src/app/api/auth/session/route.js` | Limited response fields |
+| `src/app/api/events/route.js` | Role check on GET, input validation on POST |
+| `src/app/api/events/[id]/route.js` | Grace period fix, error messages, removed slug from allowed |
+| `src/app/api/events/stats/route.js` | Added role check |
+| `src/app/api/guests/route.js` | Role check + validation on GET/POST |
+| `src/app/api/guests/[id]/route.js` | Admin-only; removed panitia bypass |
+| `src/app/api/guests/import/route.js` | CSV injection protection, generic error messages |
+| `src/app/api/activities/route.js` | Role check + whitelisted actions |
+| `src/app/api/users/route.js` | Password min 8 validation |
+| `src/app/api/users/[id]/route.js` | Password min 8 validation, error messages |
+| `src/app/api/send-qr/route.js` | Email format validation, generic errors |
+| `src/app/api/scan/[token]/route.js` | Generic error messages |
+| `src/app/api/public/events/route.js` | Anon key, limited fields |
+| `src/app/api/public/guests/route.js` | Input validation, limited response fields |
+| `src/app/api/public/check-email/route.js` | Anon key + rate limit |
+| `src/app/api/public/scan/[token]/route.js` | Anon key + fixed rate limiter |
+| `src/components/GuestTable.jsx` | QR token → link scan in detail modal |
+| `src/app/panitia/profile/page.js` | Password error message, min 8 |
+| `src/app/admin/(panel)/guests/page.js` | CSV formula injection protection in parser |
+| `next.config.mjs` | Security headers (CSP, X-Frame-Options, etc.) |
+| `supabase/migration.sql` | RLS policies for anon + panitia insert; enable Realtime for all tables |
+
+---
+
+## Database Migration Required
+
+Run the full `supabase/migration.sql` in Supabase SQL Editor (idempotent). Key additions:
+
+```sql
+-- RLS for public/anonymous access
+create policy "Public can read events" on public.events for select to anon using (true);
+create policy "Public can read profiles" on public.profiles for select to anon using (true);
+create policy "Public can read guests by qr_token" on public.guests for select to anon using (qr_token is not null);
+
+-- RLS for panitia insert
+create policy "Admin and panitia can insert guests" on public.guests for insert to authenticated
+  with check (exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'panitia')));
+
+-- Enable Realtime for subscribed tables
+alter publication supabase_realtime add table public.profiles;
+alter publication supabase_realtime add table public.events;
+alter publication supabase_realtime add table public.guests;
+alter publication supabase_realtime add table public.activities;
+```
+
+---
+
+## Build
+
+```bash
+npm run build   # ✓ Compiled successfully
+                # ✓ TypeScript passed
+                # ✓ All 33 pages generated
+```

@@ -20,6 +20,7 @@ export function useActivitiesQuery(limit = 50) {
   const result = useQuery({
     queryKey: activitiesKey(limit),
     queryFn: fetchActivities,
+    refetchInterval: 15_000,
   });
 
   useRealtimeSubscription(

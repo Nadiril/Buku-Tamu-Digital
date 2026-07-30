@@ -43,6 +43,7 @@ export function useStatsQuery() {
       const events = eventsRes.ok ? await eventsRes.json() : [];
       return computeStats(guests, events);
     },
+    refetchInterval: 30_000,
   });
 
   useRealtimeSubscription(

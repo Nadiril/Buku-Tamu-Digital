@@ -30,7 +30,6 @@ export async function PUT(request, { params }) {
       "jam_selesai",
       "grace_period_minutes",
       "status",
-      "slug",
     ];
     const updates = {};
     for (const key of allowed) {
@@ -43,7 +42,9 @@ export async function PUT(request, { params }) {
         .replace(/(^-|-$)/g, "");
     }
     if (updates.grace_period_minutes !== undefined) {
-      updates.grace_period_minutes = Number(updates.grace_period_minutes) || 30;
+      updates.grace_period_minutes = Number(updates.grace_period_minutes) >= 0
+        ? Number(updates.grace_period_minutes)
+        : 30;
     }
 
     const { data, error } = await supabase
@@ -60,11 +61,11 @@ export async function PUT(request, { params }) {
           { status: 409 },
         );
       }
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "Gagal memperbarui acara" }, { status: 500 });
     }
     return NextResponse.json(data);
   } catch (err) {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
   }
 }
 
@@ -87,6 +88,6 @@ export async function DELETE(request, { params }) {
   }
 
   const { error } = await supabase.from("events").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Gagal menghapus acara" }, { status: 500 });
   return NextResponse.json({ success: true });
 }

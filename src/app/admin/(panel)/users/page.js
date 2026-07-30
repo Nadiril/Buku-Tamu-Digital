@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import Input from "@/components/Input";
 import Button from "@/components/Button";
+import { useUsersQuery, useUserMutations } from "@/lib/queries/useUsersQuery";
 
 const roleMap = {
   admin: {
@@ -17,8 +18,8 @@ const roleMap = {
 };
 
 export default function UsersPage() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: users = [], isLoading } = useUsersQuery();
+  const { createUser, updateUser, resetPassword, deleteUser, createMutation, updateMutation, resetPasswordMutation, deleteMutation } = useUserMutations();
   const [search, setSearch] = useState("");
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -42,45 +43,16 @@ export default function UsersPage() {
   const [deletingUser, setDeletingUser] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/users");
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data);
-      }
-    } catch {
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
   const handleCreate = async (e) => {
     e.preventDefault();
     setFormError("");
     setSubmitting(true);
     try {
-      const res = await fetch("/api/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setFormError(data.error || "Gagal membuat pengguna");
-        setSubmitting(false);
-        return;
-      }
+      await createUser(form);
       setShowAddModal(false);
       setForm({ email: "", password: "", display_name: "", role: "panitia" });
-      fetchUsers();
-    } catch {
-      setFormError("Terjadi kesalahan jaringan");
+    } catch (err) {
+      setFormError(err.message || "Terjadi kesalahan jaringan");
     } finally {
       setSubmitting(false);
     }
@@ -91,25 +63,14 @@ export default function UsersPage() {
     setFormError("");
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/users/${editingUser.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          display_name: editingUser.display_name,
-          role: editingUser.role,
-        }),
+      await updateUser(editingUser.id, {
+        display_name: editingUser.display_name,
+        role: editingUser.role,
       });
-      if (!res.ok) {
-        const data = await res.json();
-        setFormError(data.error || "Gagal mengupdate pengguna");
-        setSubmitting(false);
-        return;
-      }
       setShowEditModal(false);
       setEditingUser(null);
-      fetchUsers();
-    } catch {
-      setFormError("Terjadi kesalahan jaringan");
+    } catch (err) {
+      setFormError(err.message || "Terjadi kesalahan jaringan");
     } finally {
       setSubmitting(false);
     }
@@ -120,22 +81,12 @@ export default function UsersPage() {
     setResetError("");
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/users/${resettingUser.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: newPassword }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        setResetError(data.error || "Gagal mereset password");
-        setSubmitting(false);
-        return;
-      }
+      await resetPassword(resettingUser.id, newPassword);
       setShowResetModal(false);
       setResettingUser(null);
       setNewPassword("");
-    } catch {
-      setResetError("Terjadi kesalahan jaringan");
+    } catch (err) {
+      setResetError(err.message || "Terjadi kesalahan jaringan");
     } finally {
       setSubmitting(false);
     }
@@ -144,20 +95,11 @@ export default function UsersPage() {
   const handleDelete = async () => {
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/users/${deletingUser.id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        setFormError(data.error || "Gagal menghapus pengguna");
-        setSubmitting(false);
-        return;
-      }
+      await deleteUser(deletingUser.id);
       setShowDeleteConfirm(false);
       setDeletingUser(null);
-      fetchUsers();
-    } catch {
-      setFormError("Terjadi kesalahan jaringan");
+    } catch (err) {
+      setFormError(err.message || "Terjadi kesalahan jaringan");
     } finally {
       setSubmitting(false);
     }
@@ -245,7 +187,7 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {isLoading ? (
                   <tr>
                     <td colSpan={5} className="text-center py-16">
                       <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto" />

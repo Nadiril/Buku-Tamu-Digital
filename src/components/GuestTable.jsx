@@ -467,8 +467,12 @@ export default function GuestTable({ guests, showEvent = false, events = [], onE
                   </span>
                 </div>
                 <div className="col-span-2">
-                  <p className="text-muted text-xs mb-0.5">QR Token</p>
-                  <p className="text-foreground font-mono text-xs break-all bg-input/50 rounded-lg px-3 py-2">{detailGuest.qr_token}</p>
+                  <p className="text-muted text-xs mb-0.5">Link Scan</p>
+                  <p className="text-foreground font-mono text-xs break-all bg-input/50 rounded-lg px-3 py-2">
+                    {typeof window !== "undefined"
+                      ? `${window.location.origin}/scan/${detailGuest.qr_token}`
+                      : `/scan/${detailGuest.qr_token}`}
+                  </p>
                 </div>
               </div>
             </div>

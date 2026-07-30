@@ -1,77 +1,71 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Input from "@/components/Input";
 import Button from "@/components/Button";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 
 export default function HomePage() {
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
+  const searchParams = useSearchParams();
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [message] = useState(() => searchParams.get("message") || "");
   const [checkingSession, setCheckingSession] = useState(true);
 
+  const hasMessage = searchParams.has("message");
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const msg = params.get("message");
-    if (msg) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMessage(msg.replace(/\$/g, ""));
+    if (hasMessage) {
       window.history.replaceState({}, "", "/");
     }
-  }, []);
+  }, [hasMessage]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single()
-          .then(({ data: profile }) => {
-            if (profile?.role === "admin") router.push("/admin/dashboard");
-            else router.push("/panitia");
-          });
-      } else {
-        setCheckingSession(false);
-      }
-    });
-  }, [router, supabase]);
+    fetch("/api/auth/session")
+      .then((res) => res.json())
+      .then(({ user, profile }) => {
+        if (user && profile) {
+          if (profile.role === "admin") router.push("/admin/dashboard");
+          else router.push("/panitia");
+        } else {
+          setCheckingSession(false);
+        }
+      })
+      .catch(() => setCheckingSession(false));
+  }, [router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email: form.email,
-      password: form.password,
-    });
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: form.email, password: form.password }),
+      });
 
-    if (authError || !data.user) {
-      setError("Email atau password salah. Silakan coba lagi.");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Email atau password salah");
+        setLoading(false);
+        return;
+      }
+
+      if (data.role === "admin") {
+        router.push("/admin/dashboard");
+      } else {
+        router.push("/panitia");
+      }
+    } catch {
+      setError("Terjadi kesalahan. Silakan coba lagi.");
       setLoading(false);
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", data.user.id)
-      .single();
-
-    if (profile?.role === "admin") {
-      router.push("/admin/dashboard");
-    } else {
-      router.push("/panitia");
     }
   };
 
@@ -94,7 +88,7 @@ export default function HomePage() {
       <div className="relative w-full max-w-md mx-4">
         <div className="text-center mb-8">
           <div className="w-20 h-20 rounded-2xl bg-white mx-auto flex items-center justify-center shadow-lg shadow-accent/20 mb-5 overflow-hidden">
-            <Image src="/Logo.webp" alt="Logo STIKOM PGRI Banyuwangi" width={80} height={80} className="object-contain w-full h-full" priority unoptimized />
+            <Image src="/Logo.webp" alt="Logo STIKOM PGRI Banyuwangi" width={80} height={80} className="object-contain w-full h-full" priority fetchPriority="high" sizes="80px" />
           </div>
           <h1 className="text-2xl font-bold text-foreground leading-snug">
             Buku Tamu <span className="text-black">Digital</span>
@@ -115,17 +109,16 @@ export default function HomePage() {
             </div>
 
             {message && (
-              <div className="bg-warning-muted border border-warning/20 rounded-xl px-4 py-3 text-sm text-warning flex items-center gap-2">
-                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="bg-warning-muted border border-warning/20 rounded-xl px-4 py-3 text-sm text-warning flex items-center gap-2" role="status" aria-live="polite">
+                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
                 {message}
               </div>
             )}
-
             {error && (
-              <div className="bg-danger-muted border border-danger/20 rounded-xl px-4 py-3 text-sm text-danger flex items-center gap-2">
-                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="bg-danger-muted border border-danger/20 rounded-xl px-4 py-3 text-sm text-danger flex items-center gap-2" role="status" aria-live="polite">
+                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 {error}
@@ -148,7 +141,7 @@ export default function HomePage() {
           </form>
         </div>
 
-        <p className="text-center text-[11px] text-muted/40 mt-6">v0.4.0 — Buku Tamu Digital Multi Event</p>
+        <p className="text-center text-[11px] text-muted/40 mt-6">v0.5.0 — Buku Tamu Digital Multi Event</p>
       </div>
     </div>
   );

@@ -26,7 +26,15 @@ class RealtimeManager {
           const cbs = this.callbacks.get(key);
           if (cbs) cbs.forEach((cb) => cb(payload));
         })
-        .subscribe();
+        .subscribe((status, err) => {
+          if (status === 'CHANNEL_ERROR' || status === 'SUBSCRIPTION_ERROR') {
+            if (err?.message?.includes('transport failure')) return;
+            console.warn(`[Realtime] ${key}: ${status}`, err?.message || err);
+          }
+          if (status === 'TIMED_OUT') {
+            console.info(`[Realtime] ${key} timed out, retrying...`);
+          }
+        });
 
       this.channels.set(key, channel);
     }
@@ -37,7 +45,9 @@ class RealtimeManager {
         cbs.delete(callback);
         if (cbs.size === 0) {
           const channel = this.channels.get(key);
-          if (channel) supabase.removeChannel(channel);
+          if (channel) {
+            supabase.removeChannel(channel);
+          }
           this.channels.delete(key);
           this.callbacks.delete(key);
         }
@@ -46,13 +56,6 @@ class RealtimeManager {
   }
 
   cleanup() {
-    this.channels.forEach((channel, key) => {
-      if (channel) {
-        const { createClient } = require('@/lib/supabase/client');
-        const supabase = createClient();
-        supabase.removeChannel(channel);
-      }
-    });
     this.channels.clear();
     this.callbacks.clear();
   }

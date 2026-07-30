@@ -8,6 +8,16 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile || !["admin", "panitia"].includes(profile.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const [{ count: totalEvents }, { count: totalGuests }, { count: activeEvents }] =
     await Promise.all([
       supabase.from("events").select("*", { count: "exact", head: true }),

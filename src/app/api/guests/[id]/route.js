@@ -1,5 +1,10 @@
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+
+function sanitize(value) {
+  if (typeof value !== "string") return "";
+  return value.trim().replace(/<[^>]*>/g, "").slice(0, 500);
+}
 
 export async function PUT(request, { params }) {
   const { id } = await params;
@@ -15,31 +20,13 @@ export async function PUT(request, { params }) {
     .eq("id", user.id)
     .single();
 
-  if (!profile || !["admin", "panitia"].includes(profile.role)) {
+  if (profile?.role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
     const body = await request.json();
-
-    if (profile.role !== "admin") {
-      const allowedFields = ["status_kehadiran", "waktu_kedatangan"];
-      const updates = {};
-      for (const key of allowedFields) {
-        if (body[key] !== undefined) updates[key] = body[key];
-      }
-      const service = await createServiceClient();
-      const { data, error } = await service
-        .from("guests")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json(data);
-    }
-
-    const adminFields = [
+    const allowed = [
       "nama",
       "instansi",
       "no_hp",
@@ -48,12 +35,14 @@ export async function PUT(request, { params }) {
       "status_kehadiran",
       "waktu_kedatangan",
       "acara_id",
-      "qr_token",
     ];
     const updates = {};
-    for (const key of adminFields) {
-      if (body[key] !== undefined) updates[key] = body[key];
+    for (const key of allowed) {
+      if (body[key] !== undefined) {
+        updates[key] = key === "acara_id" ? Number(body[key]) : sanitize(body[key]);
+      }
     }
+
     const { data, error } = await supabase
       .from("guests")
       .update(updates)
@@ -61,10 +50,10 @@ export async function PUT(request, { params }) {
       .select()
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Gagal memperbarui data tamu" }, { status: 500 });
     return NextResponse.json(data);
   } catch (err) {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
   }
 }
 

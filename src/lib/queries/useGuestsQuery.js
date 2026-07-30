@@ -20,6 +20,7 @@ export function useGuestsQuery() {
   const result = useQuery({
     queryKey: guestsKey(),
     queryFn: fetchGuests,
+    refetchInterval: 15_000,
   });
 
   useRealtimeSubscription(

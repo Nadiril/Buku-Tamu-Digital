@@ -20,6 +20,7 @@ export function useEventsQuery() {
   const result = useQuery({
     queryKey: eventsKey(),
     queryFn: fetchEvents,
+    refetchInterval: 15_000,
   });
 
   useRealtimeSubscription(

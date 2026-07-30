@@ -127,9 +127,15 @@ create index if not exists idx_activities_timestamp on public.activities("timest
 
 -- --- profiles ---------------------------------------------------------
 drop policy if exists "Anyone can read profiles" on public.profiles;
+drop policy if exists "Public can read profiles" on public.profiles;
 create policy "Anyone can read profiles"
   on public.profiles for select
   to authenticated
+  using (true);
+
+create policy "Public can read profiles"
+  on public.profiles for select
+  to anon
   using (true);
 
 drop policy if exists "Users can update own profile" on public.profiles;
@@ -171,9 +177,15 @@ create policy "Admin can delete profiles"
 drop policy if exists "Anyone can read events" on public.events;
 drop policy if exists "Staff can read events" on public.events;
 drop policy if exists "Authenticated can read events" on public.events;
+drop policy if exists "Public can read events" on public.events;
 create policy "Authenticated can read events"
   on public.events for select
   to authenticated
+  using (true);
+
+create policy "Public can read events"
+  on public.events for select
+  to anon
   using (true);
 
 drop policy if exists "Admin can insert events" on public.events;
@@ -206,6 +218,7 @@ drop policy if exists "Admin and scanner can read guests" on public.guests;
 drop policy if exists "Staff can read guests" on public.guests;
 drop policy if exists "Admin, staff and scanner can read guests" on public.guests;
 drop policy if exists "Authenticated can read guests" on public.guests;
+drop policy if exists "Public can read guests by qr_token" on public.guests;
 create policy "Authenticated can read guests"
   on public.guests for select
   to authenticated
@@ -213,13 +226,21 @@ create policy "Authenticated can read guests"
     exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'panitia'))
   );
 
--- Insert: admin only (pre-registering a guest before the event / issuing a QR).
+-- Only allow anon to read guests by qr_token (prevents enumeration)
+create policy "Public can read guests by qr_token"
+  on public.guests for select
+  to anon
+  using (qr_token is not null);
+
+-- Insert: admin and panitia (pre-registering a guest / manual registration).
+-- Panitia write path is enforced by the application layer (status_kehadiran = 'tidak_hadir').
 drop policy if exists "Admin can insert guests" on public.guests;
-create policy "Admin can insert guests"
+drop policy if exists "Admin and panitia can insert guests" on public.guests;
+create policy "Admin and panitia can insert guests"
   on public.guests for insert
   to authenticated
   with check (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'panitia'))
   );
 
 -- Update: admin only, via direct table access. Scanner does NOT get a
@@ -323,11 +344,11 @@ begin
   from public.profiles
   where id = p_caller_id;
 
-  if v_caller_role is null or v_caller_role not in ('admin', 'panitia') then
+  if v_caller_role is null or v_caller_role != 'panitia' then
     return jsonb_build_object(
       'success', false,
       'error_code', 'forbidden',
-      'message', 'Only admin or panitia accounts can register a scan.'
+      'message', 'Hanya panitia yang dapat melakukan scan.'
     );
   end if;
 
@@ -431,5 +452,16 @@ end;
 $$;
 
 grant execute on function public.register_guest_scan(text, uuid) to authenticated;
+
+-- =====================================================================
+-- 9. ENABLE REALTIME FOR SUBSCRIBED TABLES
+-- The client uses Supabase Realtime (postgres_changes) to keep query
+-- caches fresh.  Each table that the client subscribes to must be added
+-- to the publication.
+-- =====================================================================
+alter publication supabase_realtime add table public.profiles;
+alter publication supabase_realtime add table public.events;
+alter publication supabase_realtime add table public.guests;
+alter publication supabase_realtime add table public.activities;
 
 notify pgrst, 'reload schema';

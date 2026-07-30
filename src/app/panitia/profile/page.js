@@ -52,8 +52,8 @@ export default function ProfilePage() {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    if (passwordNew.length < 6) {
-      setToast({ id: Date.now(), message: "Password baru minimal 6 karakter", type: "error" });
+    if (passwordNew.length < 8) {
+      setToast({ id: Date.now(), message: "Password baru minimal 8 karakter", type: "error" });
       return;
     }
     if (passwordNew !== passwordConfirm) {
@@ -64,7 +64,7 @@ export default function ProfilePage() {
     try {
       const { error } = await supabase.auth.updateUser({ password: passwordNew });
       if (error) {
-        setToast({ id: Date.now(), message: error.message, type: "error" });
+        setToast({ id: Date.now(), message: "Gagal mengubah password", type: "error" });
       } else {
         setToast({ id: Date.now(), message: "Password berhasil diubah", type: "success" });
         setPasswordNew("");
@@ -205,7 +205,7 @@ export default function ProfilePage() {
                   value={passwordNew}
                   onChange={(e) => setPasswordNew(e.target.value)}
                   className="w-full h-10 rounded-lg bg-white border border-border pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring focus:border-input-focus transition-all"
-                  minLength={6}
+                  minLength={8}
                 />
                 <button
                   type="button"
@@ -230,7 +230,7 @@ export default function ProfilePage() {
                   value={passwordConfirm}
                   onChange={(e) => setPasswordConfirm(e.target.value)}
                   className="w-full h-10 rounded-lg bg-white border border-border pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring focus:border-input-focus transition-all"
-                  minLength={6}
+                  minLength={8}
                 />
                 <button
                   type="button"

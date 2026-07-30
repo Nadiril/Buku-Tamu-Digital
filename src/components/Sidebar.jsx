@@ -73,10 +73,6 @@ export default function Sidebar() {
   const email = profile?.email || "";
 
   useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
-
-  useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 1024) setMobileOpen(false);
     };
@@ -129,6 +125,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200 group
                 ${collapsed ? "justify-center py-3" : "px-3 py-2.5"}
                 ${

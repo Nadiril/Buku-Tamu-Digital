@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { realtimeManager } from './manager';
 
@@ -10,6 +10,8 @@ export function useRealtimeSubscription(table, callback, filter = null, deps = [
   useEffect(() => {
     callbackRef.current = callback;
   }, [callback]);
+
+  const filterKey = useMemo(() => JSON.stringify(filter), [filter]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -24,5 +26,6 @@ export function useRealtimeSubscription(table, callback, filter = null, deps = [
     );
 
     return cleanup;
-  }, [table, JSON.stringify(filter), ...deps]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [table, filterKey, ...deps]);
 }

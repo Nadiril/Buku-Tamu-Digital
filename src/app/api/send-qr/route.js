@@ -40,11 +40,11 @@ export async function POST(request) {
 
     const { data: guests } = await service
       .from("guests")
-      .select("*")
+      .select("id, nama, email, acara_id, qr_token")
       .in("id", guest_ids);
 
     if (!guests || guests.length === 0) {
-      return NextResponse.json({ error: "No guests found" }, { status: 404 });
+      return NextResponse.json({ error: "Tamu tidak ditemukan" }, { status: 404 });
     }
 
     const formatDate = (dateStr) =>
@@ -55,12 +55,14 @@ export async function POST(request) {
         year: "numeric",
       });
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     const results = [];
 
     for (const guest of guests) {
       const emailTo = guest.email;
-      if (!emailTo) {
-        results.push({ guest_id: guest.id, status: "skipped", reason: "No email address" });
+      if (!emailTo || !emailRegex.test(emailTo)) {
+        results.push({ guest_id: guest.id, status: "skipped", reason: "Email tidak valid" });
         continue;
       }
 
@@ -104,12 +106,12 @@ export async function POST(request) {
           error_message: mailResult.error,
         });
 
-        results.push({ guest_id: guest.id, status: "failed", error: mailResult.error });
+        results.push({ guest_id: guest.id, status: "failed" });
       }
     }
 
     return NextResponse.json({ results });
   } catch (err) {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
   }
 }

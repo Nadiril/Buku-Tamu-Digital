@@ -16,11 +16,6 @@ function PanitiaLayoutInner({ children }) {
   const panitiaName = profile?.display_name || "Panitia";
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
 
   useEffect(() => {
     if (!isLoading && !profile) {
@@ -35,10 +30,6 @@ function PanitiaLayoutInner({ children }) {
     };
     mq.addEventListener("change", handle);
     return () => mq.removeEventListener("change", handle);
-  }, []);
-
-  useEffect(() => {
-    setMounted(true);
   }, []);
 
   if (isLoading) {
@@ -56,9 +47,8 @@ function PanitiaLayoutInner({ children }) {
         onToggleCollapse={() => setCollapsed((c) => !c)}
         mobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
-        mounted={mounted}
       />
-      <div className={`${mounted ? "transition-all duration-300" : ""} ${collapsed ? "lg:ml-[72px]" : "lg:ml-[280px]"}`}>
+      <div className={`transition-all duration-300 ${collapsed ? "lg:ml-[72px]" : "lg:ml-[280px]"}`}>
         <PanitiaNavbar
           panitiaName={panitiaName}
           collapsed={collapsed}
