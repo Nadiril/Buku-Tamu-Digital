@@ -119,7 +119,9 @@ function ScanContent() {
         ));
         setScannedGuest((prev) => ({ ...prev, status_kehadiran: data.status }));
         setSubmitted(true);
-        logActivity({ action: "scan_guest", detail: `Scan kehadiran "${scannedGuest.nama}" di "${selectedEvent?.nama_acara}"` });
+        const scanTime = new Date(data.guest?.waktu_kedatangan || new Date().toISOString()).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+        const scanStatus = data.status === "terlambat" ? "terlambat" : "tepat waktu";
+        logActivity({ action: "scan_guest", detail: `Tamu "${scannedGuest.nama}" dari "${scannedGuest.instansi}" check-in ${scanStatus} pukul ${scanTime} di "${selectedEvent?.nama_acara}"` });
         showToast(
           data.status === "hadir" ? "Kehadiran tepat waktu!" : "Tamu tercatat terlambat."
         );

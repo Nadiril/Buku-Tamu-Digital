@@ -393,7 +393,7 @@ begin
     insert into public.activities (action, detail, user_id)
     values (
       'scan_rejected_event_ended',
-      format('Guest %s (id=%s) scan attempted after event end at %s', v_guest.nama, v_guest.id, v_now),
+      format('Tamu "%s" dari "%s" mencoba check-in setelah acara "%s" berakhir', v_guest.nama, v_guest.instansi, v_event.nama_acara),
       p_caller_id
     );
     return jsonb_build_object(
@@ -433,7 +433,7 @@ begin
   insert into public.activities (action, detail, user_id)
   values (
     'guest_scanned',
-    format('Guest %s (id=%s) marked %s at %s', v_guest.nama, v_guest.id, v_new_status, v_now),
+    format('Tamu "%s" dari "%s" check-in %s pukul %s di "%s"', v_guest.nama, v_guest.instansi, case when v_new_status = 'terlambat' then 'terlambat' else 'tepat waktu' end, to_char(v_now AT TIME ZONE 'Asia/Jakarta', 'HH24:MI'), v_event.nama_acara),
     p_caller_id
   );
 

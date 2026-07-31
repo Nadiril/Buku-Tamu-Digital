@@ -55,11 +55,13 @@ function ScanQRContent() {
         });
         setScannedGuest((prev) => ({ ...prev, status_kehadiran: data.status }));
         setSubmitted(true);
+        const scanTime = new Date(data.guest?.waktu_kedatangan || new Date().toISOString()).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
         setScanHistory((prev) => [
-          { id: Date.now(), nama: scannedGuest.nama, instansi: scannedGuest.instansi, no_hp: scannedGuest.no_hp, kategori_tamu: scannedGuest.kategori_tamu, event: selectedEvent?.nama_acara || allEvents.find((e) => e.id === scannedGuest.acara_id)?.nama_acara, status: data.status, time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) },
+          { id: Date.now(), nama: scannedGuest.nama, instansi: scannedGuest.instansi, no_hp: scannedGuest.no_hp, kategori_tamu: scannedGuest.kategori_tamu, event: selectedEvent?.nama_acara || allEvents.find((e) => e.id === scannedGuest.acara_id)?.nama_acara, status: data.status, time: scanTime },
           ...prev,
         ]);
-        logActivity({ action: "scan_guest", detail: `Scan kehadiran "${scannedGuest.nama}"` + (selectedEvent ? ` di "${selectedEvent.nama_acara}"` : "") });
+        const scanStatus = data.status === "terlambat" ? "terlambat" : "tepat waktu";
+        logActivity({ action: "scan_guest", detail: `Tamu "${scannedGuest.nama}" dari "${scannedGuest.instansi}" check-in ${scanStatus} pukul ${scanTime}` + (selectedEvent ? ` di "${selectedEvent.nama_acara}"` : "") });
         showToast(
           data.status === "hadir" ? "Kehadiran tepat waktu!" :
           data.status === "terlambat" ? "Tamu tercatat terlambat." :
@@ -275,19 +277,27 @@ function ScanQRContent() {
           </div>
           {scanHistory.length > 0 ? (
             <div className="space-y-2 sm:space-y-3">
-              {scanHistory.map((item) => (
-                <div key={item.id} className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-input/30 border border-border">
-                  <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-success-muted flex items-center justify-center shrink-0">
-                    <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-success" />
+              {scanHistory.map((item) => {
+                const isLate = item.status === "terlambat";
+                return (
+                  <div key={item.id} className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-input/30 border border-border">
+                    <div className={`w-7 h-7 sm:w-9 sm:h-9 rounded-lg ${isLate ? "bg-warning-muted" : "bg-success-muted"} flex items-center justify-center shrink-0`}>
+                      <CheckCircle className={`w-3 h-3 sm:w-4 sm:h-4 ${isLate ? "text-warning" : "text-success"}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-semibold text-foreground">{item.nama}</p>
+                      <p className="text-[10px] sm:text-xs text-muted">{item.instansi}</p>
+                      <p className="text-[10px] sm:text-xs text-muted/60">{item.event}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span className={`text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full inline-block ${isLate ? "bg-warning-muted text-warning" : "bg-success-muted text-success"}`}>
+                        {isLate ? "Terlambat" : "Hadir"}
+                      </span>
+                      <span className="block text-[10px] sm:text-xs text-muted/60 mt-1">{item.time}</span>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs sm:text-sm font-semibold text-foreground">{item.nama}</p>
-                    <p className="text-[10px] sm:text-xs text-muted">{item.instansi}</p>
-                    <p className="text-[10px] sm:text-xs text-muted/60">{item.event}</p>
-                  </div>
-                  <span className="text-[10px] sm:text-xs text-muted/60 shrink-0">{item.time}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-10 sm:py-16 px-4 sm:px-6 text-center">
