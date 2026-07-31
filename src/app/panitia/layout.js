@@ -1,3 +1,4 @@
+import AuthGuard from "@/components/AuthGuard";
 import PanitiaLayout from "@/components/panitia/PanitiaLayout";
 
 export const metadata = {
@@ -6,5 +7,9 @@ export const metadata = {
 };
 
 export default function Layout({ children }) {
-  return <PanitiaLayout>{children}</PanitiaLayout>;
+  return (
+    <AuthGuard>
+      <PanitiaLayout>{children}</PanitiaLayout>
+    </AuthGuard>
+  );
 }
