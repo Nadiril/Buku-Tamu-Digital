@@ -164,9 +164,9 @@ function HomePageContent() {
               />
             </div>
             <div className="leading-tight">
-              <p className="text-[17px] font-extrabold tracking-[0.08em]">
+              {/* <p className="text-[17px] font-extrabold tracking-[0.08em]">
                 TAMUKU
-              </p>
+              </p> */}
               <p className="text-xs font-medium text-white/70">
                 Buku Tamu Digital
               </p>
@@ -216,7 +216,7 @@ dan pelaporan acara secara realtime.
 
           {/* Footer */}
           <div className="login-fade-up login-delay-5 relative z-10">
-            <p className="text-sm font-semibold text-white/80">© 2026 Tamuku</p>
+            <p className="text-sm font-semibold text-white/80">© 2026 Buku Tamu Digital</p>
             <p className="mt-0.5 text-[13px] text-white/60">
               Powered by STIKOM PGRI Banyuwangi
             </p>
