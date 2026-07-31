@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Scanner, useDevices } from "@yudiel/react-qr-scanner";
+import "@/lib/zxing";
 
 export default function QRScanner({ onScan, onError }) {
   const scannerRef = useRef(null);

@@ -44,7 +44,7 @@ export function useActivitiesQuery(limit = 50) {
 export function useLogActivity() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: async ({ action, detail, ...meta }) => {
       const res = await fetch('/api/activities', {
         method: 'POST',
@@ -61,4 +61,11 @@ export function useLogActivity() {
       });
     },
   });
+
+  const logActivity = useCallback(
+    (args) => mutation.mutateAsync(args).catch(() => null),
+    [mutation]
+  );
+
+  return { ...mutation, mutateAsync: logActivity, logActivity };
 }

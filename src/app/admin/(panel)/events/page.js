@@ -56,10 +56,14 @@ export default function EventsPage() {
       grace_period_minutes: parseInt(newEvent.grace_period_minutes) || 30,
       status: "akan_datang",
     };
-    await addEvent(event);
-    logActivity({ action: "create_event", detail: `Membuat acara "${event.nama_acara}"` });
-    resetForm();
-    showToast("Acara berhasil dibuat!");
+    try {
+      await addEvent(event);
+      await logActivity({ action: "create_event", detail: `Membuat acara "${event.nama_acara}"` });
+      resetForm();
+      showToast("Acara berhasil dibuat!");
+    } catch {
+      showToast("Gagal membuat acara. Nama/slug mungkin sudah dipakai.", "error");
+    }
   };
 
   const handleEdit = (event) => {
@@ -78,18 +82,22 @@ export default function EventsPage() {
 
   const handleUpdateEvent = async (e) => {
     e.preventDefault();
-    await updateEvent(editingEvent.id, {
-      nama_acara: newEvent.nama_acara,
-      lokasi: newEvent.lokasi,
-      tanggal_mulai: newEvent.tanggal_mulai,
-      tanggal_selesai: newEvent.tanggal_selesai,
-      jam_mulai: newEvent.jam_mulai,
-      jam_selesai: newEvent.jam_selesai || "17:00",
-      grace_period_minutes: parseInt(newEvent.grace_period_minutes) || 30,
-    });
-    logActivity({ action: "update_event", detail: `Mengedit acara "${newEvent.nama_acara}"` });
-    resetForm();
-    showToast("Acara berhasil diperbarui!");
+    try {
+      await updateEvent(editingEvent.id, {
+        nama_acara: newEvent.nama_acara,
+        lokasi: newEvent.lokasi,
+        tanggal_mulai: newEvent.tanggal_mulai,
+        tanggal_selesai: newEvent.tanggal_selesai,
+        jam_mulai: newEvent.jam_mulai,
+        jam_selesai: newEvent.jam_selesai || "17:00",
+        grace_period_minutes: parseInt(newEvent.grace_period_minutes) || 30,
+      });
+      await logActivity({ action: "update_event", detail: `Mengedit acara "${newEvent.nama_acara}"` });
+      resetForm();
+      showToast("Acara berhasil diperbarui!");
+    } catch {
+      showToast("Gagal memperbarui acara. Silakan coba lagi.", "error");
+    }
   };
 
   const handleDelete = (id) => {
@@ -98,10 +106,15 @@ export default function EventsPage() {
 
   const confirmDelete = async () => {
     const deleted = events.find((e) => e.id === confirmDeleteId);
-    await deleteEvent(confirmDeleteId);
-    if (deleted) logActivity({ action: "delete_event", detail: `Menghapus acara "${deleted.nama_acara}"` });
-    setConfirmDeleteId(null);
-    showToast("Acara berhasil dihapus!");
+    try {
+      await deleteEvent(confirmDeleteId);
+      if (deleted) await logActivity({ action: "delete_event", detail: `Menghapus acara "${deleted.nama_acara}"` });
+      setConfirmDeleteId(null);
+      showToast("Acara berhasil dihapus!");
+    } catch {
+      setConfirmDeleteId(null);
+      showToast("Gagal menghapus acara. Silakan coba lagi.", "error");
+    }
   };
 
   const handleStatusChange = async (event, newStatus) => {
@@ -124,13 +137,17 @@ export default function EventsPage() {
       }
     }
 
-    const result = await updateEvent(event.id, { status: newStatus });
-    if (!result) {
+    try {
+      const result = await updateEvent(event.id, { status: newStatus });
+      if (!result) {
+        showToast("Gagal mengubah status acara. Silakan coba lagi.", "error");
+        return;
+      }
+      await logActivity({ action: "update_status", detail: `Mengubah status "${event.nama_acara}" menjadi "${statusLabels[newStatus]}"` });
+      showToast("Status acara berhasil diperbarui!");
+    } catch {
       showToast("Gagal mengubah status acara. Silakan coba lagi.", "error");
-      return;
     }
-    logActivity({ action: "update_status", detail: `Mengubah status "${event.nama_acara}" menjadi "${statusLabels[newStatus]}"` });
-    showToast("Status acara berhasil diperbarui!");
   };
 
   return (

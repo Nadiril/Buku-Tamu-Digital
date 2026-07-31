@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { generateToken } from "@/lib/token";
 
 const CSV_FORMULA_CHARS = ["=", "+", "-", "@"];
+const VALID_KATEGORI = ["reguler", "vip", "vvip"];
 
 function sanitize(value) {
   if (typeof value !== "string") return "";
@@ -40,16 +41,24 @@ export async function POST(request) {
       return NextResponse.json({ error: "Data tamu tidak valid" }, { status: 400 });
     }
 
-    const guests = guestData.map((g) => ({
-      nama: sanitize(g.nama) || "Tamu",
-      instansi: sanitize(g.instansi) || "—",
-      no_hp: g.no_hp ? sanitize(g.no_hp).slice(0, 20) : null,
-      tujuan: g.tujuan ? sanitize(g.tujuan) : null,
-      kategori_tamu: (g.kategori_tamu || "reguler").toLowerCase(),
-      status_kehadiran: "tidak_hadir",
-      acara_id: g.acara_id,
-      qr_token: generateToken(),
-    }));
+    const guests = guestData.map((g) => {
+      const kategori = String(g.kategori_tamu || "reguler").toLowerCase();
+      const acaraId = Number(g.acara_id);
+      return {
+        nama: sanitize(g.nama) || "Tamu",
+        instansi: sanitize(g.instansi) || "—",
+        no_hp: g.no_hp ? sanitize(g.no_hp).slice(0, 20) : null,
+        tujuan: g.tujuan ? sanitize(g.tujuan) : null,
+        kategori_tamu: VALID_KATEGORI.includes(kategori) ? kategori : "reguler",
+        status_kehadiran: "tidak_hadir",
+        acara_id: Number.isFinite(acaraId) ? acaraId : null,
+        qr_token: generateToken(),
+      };
+    });
+
+    if (guests.some((g) => !Number.isInteger(g.acara_id))) {
+      return NextResponse.json({ error: "Data acara (acara_id) tidak valid" }, { status: 400 });
+    }
 
     const { data, error } = await supabase.from("guests").insert(guests).select();
 

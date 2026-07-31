@@ -4,6 +4,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Scanner, useDevices } from "@yudiel/react-qr-scanner";
+import "@/lib/zxing";
 import { useGuestsQuery, useGuestMutations, guestsKey } from "@/lib/queries/useGuestsQuery";
 import { useEventsQuery } from "@/lib/queries/useEventsQuery";
 import { useLogActivity } from "@/lib/queries/useActivitiesQuery";
@@ -22,6 +23,10 @@ import {
   RotateCcw,
   X,
   CalendarRange,
+  MapPin,
+  Users,
+  Calendar,
+  Clock,
 } from "lucide-react";
 
 const statusKehadiranMap = {
@@ -29,6 +34,31 @@ const statusKehadiranMap = {
   terlambat: { badge: "bg-warning-light text-warning border border-warning/20", label: "Terlambat" },
   tidak_hadir: { badge: "bg-danger-light text-danger border border-danger/20", label: "Tidak Hadir" },
 };
+
+const statusStyles = {
+  registrasi_dibuka: {
+    badge: "bg-success-light text-success border border-success/20",
+    dot: "bg-success",
+    label: "Registrasi Dibuka",
+  },
+  akan_datang: {
+    badge: "bg-warning-light text-warning border border-warning/20",
+    dot: "bg-warning",
+    label: "Akan Datang",
+  },
+  registrasi_ditutup: {
+    badge: "bg-danger-light text-danger border border-danger/20",
+    dot: "bg-danger",
+    label: "Registrasi Ditutup",
+  },
+};
+
+const formatDate = (dateStr) =>
+  new Date(dateStr).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 
 function ScanContent() {
   const searchParams = useSearchParams();
@@ -150,30 +180,109 @@ function ScanContent() {
     }
   };
 
-  // No event selected
+  // No event selected — show event cards to pick from
   if (!selectedEvent) {
     return (
-      <div className="p-6 max-w-7xl mx-auto">
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-          <div className="w-16 h-16 rounded-2xl bg-muted/5 border border-border flex items-center justify-center mb-4">
-            <QrCode className="w-8 h-8 text-muted-foreground/40" />
+      <div className="w-full max-w-[1440px] mx-auto px-6 max-lg:px-5 max-sm:px-4 py-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-foreground tracking-tight">Scan QR</h1>
+            <p className="text-sm text-muted-foreground mt-1">Pilih acara untuk mulai memindai QR tamu</p>
           </div>
-          <h3 className="text-base font-semibold text-foreground mb-1">Acara Tidak Dipilih</h3>
-          <p className="text-sm text-muted-foreground mb-6">Silakan pilih acara terlebih dahulu untuk memulai scan.</p>
           <button
             onClick={() => router.push("/panitia/events")}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent-hover transition-colors cursor-pointer"
+            className="hidden sm:inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-card-hover transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
-            Pilih Acara
+            Semua Acara
           </button>
         </div>
+
+        {events.length === 0 ? (
+          <div className="flex flex-col items-center justify-center min-h-[55vh] text-center">
+            <div className="w-16 h-16 rounded-2xl bg-muted/5 border border-border flex items-center justify-center mb-4">
+              <QrCode className="w-8 h-8 text-muted-foreground/40" />
+            </div>
+            <h3 className="text-base font-semibold text-foreground mb-1">Belum Ada Acara</h3>
+            <p className="text-sm text-muted-foreground mb-6">Silakan tunggu admin membuat acara terlebih dahulu.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-lg:gap-5 max-sm:gap-4">
+            {events.map((event) => {
+              const s = statusStyles[event.status] || statusStyles.akan_datang;
+              const totalTamu = guests.filter((g) => g.acara_id === event.id).length;
+              const checkedIn = guests.filter(
+                (g) => g.acara_id === event.id && (g.status_kehadiran === "hadir" || g.status_kehadiran === "terlambat")
+              ).length;
+              const canScan = event.status === "registrasi_dibuka";
+
+              return (
+                <div
+                  key={event.id}
+                  className={`group bg-white rounded-xl border transition-all duration-200 overflow-hidden ${
+                    canScan
+                      ? "border-border hover:border-accent/30 hover:shadow-lg hover:shadow-accent/[0.03]"
+                      : "border-border hover:border-border-hover hover:shadow-sm"
+                  }`}
+                >
+                  <div className={`h-1 w-full ${canScan ? "bg-accent" : event.status === "akan_datang" ? "bg-warning" : "bg-muted-foreground/20"}`} />
+                  <div className="p-6 max-lg:p-5 max-sm:p-4 space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <span className={`${s.badge} text-[10px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                          {s.label}
+                        </span>
+                        <h3 className="text-sm font-semibold text-foreground truncate group-hover:text-accent transition-colors mt-1">
+                          {event.nama_acara}
+                        </h3>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{event.lokasi}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <CalendarRange className="w-3.5 h-3.5 shrink-0" />
+                        <span>{formatDate(event.tanggal_mulai)}{event.jam_mulai ? `, ${event.jam_mulai}` : ""}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Users className="w-3.5 h-3.5 shrink-0" />
+                        <span className="font-medium text-foreground/70">{totalTamu}</span> Tamu
+                        {checkedIn > 0 && <span className="text-success">· {checkedIn} hadir</span>}
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-border/50">
+                      {canScan ? (
+                        <button
+                          onClick={() => router.push(`/panitia/scan?eventId=${event.id}`)}
+                          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-accent text-white text-xs font-medium hover:bg-accent-hover transition-colors cursor-pointer"
+                        >
+                          <QrCode className="w-3.5 h-3.5" />
+                          Scan QR
+                        </button>
+                      ) : (
+                        <div className="inline-flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg bg-muted/5 text-muted-foreground/50 text-xs font-medium">
+                          <Clock className="w-3.5 h-3.5" />
+                          {event.status === "akan_datang" ? "Registrasi Belum Dibuka" : "Registrasi Ditutup"}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }
 
   // Still loading guests
-  if (!guestsLoaded) {
+  if (guestsLoaded) {
     return (
       <div className="p-6 max-w-7xl mx-auto">
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">

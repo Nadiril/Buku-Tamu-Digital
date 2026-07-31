@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 const rateLimitMap = new Map();
@@ -36,7 +37,7 @@ export async function POST(request) {
   }
 
   try {
-    const { email, password } = await request.json();
+    const { email, password, remember } = await request.json();
 
     if (!email || !password || typeof email !== "string" || typeof password !== "string") {
       return NextResponse.json({ error: "Email dan password wajib diisi" }, { status: 400 });
@@ -45,7 +46,16 @@ export async function POST(request) {
       return NextResponse.json({ error: "Email atau password tidak valid" }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const rememberMe = remember !== false;
+
+    const cookieStore = await cookies();
+    cookieStore.set("tamuku_remember", rememberMe ? "1" : "0", {
+      path: "/",
+      sameSite: "lax",
+      ...(rememberMe ? { maxAge: 30 * 24 * 60 * 60 } : {}),
+    });
+
+    const supabase = await createClient({ remember: rememberMe });
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,

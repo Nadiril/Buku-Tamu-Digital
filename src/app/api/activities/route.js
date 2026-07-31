@@ -1,7 +1,20 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
-const ALLOWED_ACTIONS = ["create_guest", "update_guest", "delete_guest", "scan_guest", "import_guests", "send_qr_email"];
+const ALLOWED_ACTIONS = [
+  "create_guest",
+  "update_guest",
+  "delete_guest",
+  "import_guest",
+  "import_guests",
+  "scan_guest",
+  "send_qr_email",
+  "create_event",
+  "update_event",
+  "delete_event",
+  "update_status",
+  "export_laporan",
+];
 
 export async function GET() {
   const supabase = await createClient();

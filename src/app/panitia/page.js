@@ -31,19 +31,21 @@ export default function PanitiaDashboardPage() {
 
   const filteredEvents = useMemo(() => {
     if (selectedEventId === "all") return events;
-    return events.filter((e) => e.id === selectedEventId);
+    return events.filter((e) => e.id === parseInt(selectedEventId));
   }, [events, selectedEventId]);
 
   const filteredGuests = useMemo(() => {
     if (selectedEventId === "all") return guests;
-    return guests.filter((g) => g.event_id === selectedEventId);
+    return guests.filter((g) => g.acara_id === parseInt(selectedEventId));
   }, [guests, selectedEventId]);
 
   const stats = useMemo(() => {
     const activeEvents = filteredEvents.filter((e) => e.status === "registrasi_dibuka");
-    const today = new Date().toISOString().split("T")[0];
+    const todayStart = new Date();
+    todayStart.setHours(7, 0, 0, 0);
+    const todayEnd = new Date(todayStart.getTime() + 86400000);
     const todayGuests = filteredGuests.filter(
-      (g) => g.waktu_kedatangan && g.waktu_kedatangan.startsWith(today)
+      (g) => g.waktu_kedatangan && new Date(g.waktu_kedatangan) >= todayStart && new Date(g.waktu_kedatangan) < todayEnd
     );
     const checkedIn = filteredGuests.filter(
       (g) => g.status_kehadiran === "hadir" || g.status_kehadiran === "terlambat"
@@ -112,7 +114,10 @@ export default function PanitiaDashboardPage() {
           </div>
         </div>
       ) : activeEvent ? (
-        <div className="relative overflow-hidden rounded-xl border border-accent/10 bg-gradient-to-br from-accent/5 via-white to-white p-5">
+        <div
+          onClick={() => router.push(`/panitia/scan?eventId=${activeEvent.id}`)}
+          className="relative overflow-hidden rounded-xl border border-accent/10 bg-gradient-to-br from-accent/5 via-white to-white p-5 cursor-pointer hover:border-accent/30 hover:shadow-lg hover:shadow-accent/[0.05] transition-all duration-200"
+        >
           <div className="absolute top-0 right-0 w-64 h-64 bg-accent/[0.03] rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
           <div className="relative flex items-start justify-between gap-4">
             <div className="space-y-2">
@@ -142,7 +147,10 @@ export default function PanitiaDashboardPage() {
               </div>
             </div>
             <button
-              onClick={() => router.push("/panitia/scan")}
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/panitia/scan?eventId=${activeEvent.id}`);
+              }}
               className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent-hover transition-colors shadow-lg shadow-accent/20 cursor-pointer"
             >
               <QrCode className="w-4 h-4" />

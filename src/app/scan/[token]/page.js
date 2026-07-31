@@ -122,7 +122,9 @@ export default function ScanPage({ params }) {
             <div className="flex justify-between text-sm border-t border-border/50 pt-3">
               <span className="text-muted">Waktu Hadir</span>
               <span className="text-foreground font-medium">
-                {new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} WIB
+                {guest.waktu_kedatangan
+                  ? new Date(guest.waktu_kedatangan).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })
+                  : "—"} WIB
               </span>
             </div>
           </div>

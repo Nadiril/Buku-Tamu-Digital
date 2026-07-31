@@ -12,9 +12,11 @@ export function statsKey() {
 
 function computeStats(guests, events) {
   const activeEvents = events.filter((e) => e.status === 'registrasi_dibuka');
-  const today = new Date().toISOString().split('T')[0];
+  const todayStart = new Date();
+  todayStart.setHours(7, 0, 0, 0);
+  const todayEnd = new Date(todayStart.getTime() + 86400000);
   const todayGuests = guests.filter(
-    (g) => g.waktu_kedatangan && g.waktu_kedatangan.startsWith(today)
+    (g) => g.waktu_kedatangan && new Date(g.waktu_kedatangan) >= todayStart && new Date(g.waktu_kedatangan) < todayEnd
   );
 
   return {

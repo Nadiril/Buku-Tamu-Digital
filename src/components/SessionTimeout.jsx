@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
@@ -37,33 +37,84 @@ function formatCountdown(ms) {
 export default function SessionTimeout({ role = "admin" }) {
   const router = useRouter();
   const supabaseRef = useRef(null);
+  const [expired, setExpired] = useState(false);
 
   useEffect(() => {
     supabaseRef.current = createClient();
   }, []);
 
-  const handleTimeout = useCallback(async () => {
+  const endSession = useCallback(async () => {
     try {
       await supabaseRef.current.auth.signOut();
     } catch {}
 
     clearAuthStorage();
+  }, []);
 
-    const redirectUrl = new URL("/", window.location.origin);
-    redirectUrl.searchParams.set(
-      "message",
-      "Sesi Anda telah berakhir karena tidak ada aktivitas."
-    );
-    redirectUrl.searchParams.set("type", "timeout");
-    router.push(redirectUrl.toString().replace(window.location.origin, ""));
-  }, [router]);
+  const handleTimeout = useCallback(() => {
+    setExpired(true);
+  }, []);
+
+  const handleGoToLogin = useCallback(async () => {
+    await endSession();
+    router.push("/");
+  }, [endSession, router]);
+
+  const handleForceLogout = useCallback(async () => {
+    await endSession();
+    router.push("/");
+  }, [endSession, router]);
 
   const { showWarning, remaining, extend, forceTimeout } = useIdleTimer({
     timeout: TIMEOUT,
     warningBefore: WARNING_BEFORE,
     onTimeout: handleTimeout,
+    onForceTimeout: handleForceLogout,
     channelId: role,
   });
+
+  if (expired) {
+    return (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="glass-card rounded-2xl p-6 w-full max-w-sm mx-4 glow-accent">
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-warning-muted flex items-center justify-center">
+              <svg
+                className="w-6 h-6 text-warning"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+                />
+              </svg>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold text-foreground">
+                Sesi Telah Berakhir
+              </h3>
+              <p className="text-sm text-muted mt-1 leading-relaxed">
+                Sesi Anda telah berakhir karena tidak ada aktivitas. Silakan
+                masuk kembali.
+              </p>
+            </div>
+
+            <button
+              onClick={handleGoToLogin}
+              className="w-full py-2.5 px-4 rounded-xl bg-accent text-white text-sm font-medium hover:bg-accent-hover transition-colors cursor-pointer shadow-lg shadow-accent/20 mt-2"
+            >
+              Mengerti
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!showWarning) return null;
 

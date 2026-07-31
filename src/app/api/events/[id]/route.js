@@ -56,8 +56,15 @@ export async function PUT(request, { params }) {
 
     if (error) {
       if (error.code === "23505") {
+        const detail = `${error.message} ${error.details || ""}`.toLowerCase();
+        if (detail.includes("single_active")) {
+          return NextResponse.json(
+            { error: "Hanya satu acara yang bisa berstatus Registrasi Dibuka dalam satu waktu." },
+            { status: 409 },
+          );
+        }
         return NextResponse.json(
-          { error: "Hanya satu acara yang bisa berstatus Registrasi Dibuka dalam satu waktu." },
+          { error: "Nama acara sudah dipakai. Gunakan nama yang berbeda." },
           { status: 409 },
         );
       }

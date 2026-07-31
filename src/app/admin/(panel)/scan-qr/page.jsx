@@ -49,9 +49,9 @@ function ScanQRContent() {
       const res = await fetch(`/api/scan/${scannedGuest.qr_token}?acara_id=${eventId}`, { method: "POST" });
       const data = await res.json();
       if (data.success) {
-        updateGuest(scannedGuest.id, {
+        await updateGuest(scannedGuest.id, {
           status_kehadiran: data.status,
-          waktu_kedatangan: new Date().toISOString(),
+          waktu_kedatangan: data.guest?.waktu_kedatangan || new Date().toISOString(),
         });
         setScannedGuest((prev) => ({ ...prev, status_kehadiran: data.status }));
         setSubmitted(true);

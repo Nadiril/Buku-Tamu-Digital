@@ -344,11 +344,11 @@ begin
   from public.profiles
   where id = p_caller_id;
 
-  if v_caller_role is null or v_caller_role != 'panitia' then
+  if v_caller_role is null or v_caller_role not in ('admin', 'panitia') then
     return jsonb_build_object(
       'success', false,
       'error_code', 'forbidden',
-      'message', 'Hanya panitia yang dapat melakukan scan.'
+      'message', 'Hanya admin dan panitia yang dapat melakukan scan.'
     );
   end if;
 
@@ -459,9 +459,23 @@ grant execute on function public.register_guest_scan(text, uuid) to authenticate
 -- caches fresh.  Each table that the client subscribes to must be added
 -- to the publication.
 -- =====================================================================
-alter publication supabase_realtime add table public.profiles;
-alter publication supabase_realtime add table public.events;
-alter publication supabase_realtime add table public.guests;
-alter publication supabase_realtime add table public.activities;
+-- Idempotent: only add tables that are not already members of the publication.
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['profiles', 'events', 'guests', 'activities']
+  loop
+    if not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
 
 notify pgrst, 'reload schema';

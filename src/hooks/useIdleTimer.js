@@ -20,6 +20,7 @@ export function useIdleTimer({
   timeout = 30 * 60 * 1000,
   warningBefore = 60 * 1000,
   onTimeout,
+  onForceTimeout,
   channelId = "default",
 }) {
   const [showWarning, setShowWarning] = useState(false);
@@ -28,6 +29,7 @@ export function useIdleTimer({
   const timeoutRef = useRef(timeout);
   const warningBeforeRef = useRef(warningBefore);
   const onTimeoutRef = useRef(onTimeout);
+  const onForceTimeoutRef = useRef(onForceTimeout);
 
   const lastActivityRef = useRef(null);
   const warningTimerRef = useRef(null);
@@ -46,6 +48,10 @@ export function useIdleTimer({
   useEffect(() => {
     onTimeoutRef.current = onTimeout;
   }, [onTimeout]);
+
+  useEffect(() => {
+    onForceTimeoutRef.current = onForceTimeout;
+  }, [onForceTimeout]);
 
   const clearAllTimers = useCallback(() => {
     if (warningTimerRef.current) {
@@ -102,7 +108,7 @@ export function useIdleTimer({
   const forceTimeout = useCallback(() => {
     clearAllTimers();
     setShowWarning(false);
-    onTimeoutRef.current?.();
+    (onForceTimeoutRef.current || onTimeoutRef.current)?.();
     channelRef.current?.postMessage({ type: "TIMEOUT" });
   }, [clearAllTimers]);
 
@@ -173,6 +179,7 @@ export function useIdleTimer({
         } else if (event.data.type === "TIMEOUT") {
           clearAllTimers();
           setShowWarning(false);
+          onTimeoutRef.current?.();
         }
       };
     } catch {
@@ -184,6 +191,7 @@ export function useIdleTimer({
             else if (data.type === "TIMEOUT") {
               clearAllTimers();
               setShowWarning(false);
+              onTimeoutRef.current?.();
             }
           } catch {}
         }

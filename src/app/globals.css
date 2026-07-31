@@ -24,8 +24,9 @@
   --color-input: #ffffff;
   --color-input-border: #d1d5db;
   --color-input-focus: #2563eb;
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-jakarta);
+  --font-mono: var(--font-jakarta);
+  --font-jakarta: var(--font-jakarta);
 }
 
 * {
@@ -88,4 +89,79 @@ body {
 
 .table-row-hover:hover {
   background-color: rgba(37, 99, 235, 0.04);
+}
+
+/* ── Login page ───────────────────────────────────────────── */
+
+/* Subtle noise texture overlay */
+.login-noise::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='180'%20height='180'%3E%3Cfilter%20id='n'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.85'%20numOctaves='3'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Entrance animations */
+@keyframes login-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.login-fade-up {
+  animation: login-fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.login-delay-1 { animation-delay: 0.05s; }
+.login-delay-2 { animation-delay: 0.1s; }
+.login-delay-3 { animation-delay: 0.15s; }
+.login-delay-4 { animation-delay: 0.2s; }
+.login-delay-5 { animation-delay: 0.25s; }
+
+/* Soft shine sweep across the branding panel */
+@keyframes login-shine {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(220%) skewX(-18deg);
+  }
+}
+
+.login-shine {
+  animation: login-shine 9s ease-in-out infinite;
+}
+
+/* Slow float for decorative circles */
+@keyframes login-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+
+.login-float {
+  animation: login-float 7s ease-in-out infinite;
+}
+
+.login-float-slow {
+  animation: login-float 11s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-fade-up,
+  .login-shine,
+  .login-float,
+  .login-float-slow {
+    animation: none;
+  }
 }

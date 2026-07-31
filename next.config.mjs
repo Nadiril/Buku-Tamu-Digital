@@ -3,6 +3,7 @@ const nextConfig = {
   reactCompiler: true,
   images: {
     formats: ["image/avif", "image/webp"],
+    qualities: [50, 75],
   },
   async headers() {
     return [
@@ -35,6 +36,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https://api.qrserver.com",
               "font-src 'self' data:",
+              "media-src 'self' data:",
               "connect-src 'self' https://iksogaopebiyhnykalnb.supabase.co",
               "frame-ancestors 'none'",
             ].join("; "),

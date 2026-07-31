@@ -15,6 +15,7 @@ export function createClient() {
           return all;
         },
         setAll(cookiesToSet) {
+          const remember = document.cookie.includes("tamuku_remember=1");
           cookiesToSet.forEach(({ name, value, options }) => {
             const { maxAge, ...rest } = options;
             let cookie = `${name}=${value}`;
@@ -22,6 +23,7 @@ export function createClient() {
             if (rest.domain) cookie += `; domain=${rest.domain}`;
             if (rest.sameSite) cookie += `; samesite=${rest.sameSite}`;
             if (rest.secure) cookie += "; secure";
+            if (remember && maxAge) cookie += `; max-age=${maxAge}`;
             document.cookie = cookie;
           });
         },

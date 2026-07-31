@@ -81,7 +81,22 @@ export async function POST(request) {
       .select()
       .single();
 
-    if (error) return NextResponse.json({ error: "Gagal membuat acara" }, { status: 500 });
+    if (error) {
+      if (error.code === "23505") {
+        const detail = `${error.message} ${error.details || ""}`.toLowerCase();
+        if (detail.includes("single_active")) {
+          return NextResponse.json(
+            { error: "Hanya satu acara yang bisa berstatus Registrasi Dibuka dalam satu waktu." },
+            { status: 409 },
+          );
+        }
+        return NextResponse.json(
+          { error: "Nama acara sudah dipakai. Gunakan nama yang berbeda." },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json({ error: "Gagal membuat acara" }, { status: 500 });
+    }
     return NextResponse.json(data, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });

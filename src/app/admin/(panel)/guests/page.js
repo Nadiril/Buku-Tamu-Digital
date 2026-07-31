@@ -61,37 +61,46 @@ export default function GuestsPage() {
     setShowModal(true);
   };
 
-  const handleUpdateGuest = (e) => {
+  const handleUpdateGuest = async (e) => {
     e.preventDefault();
     const acaraId = eventFilter ? parseInt(eventFilter) : parseInt(newGuest.acara_id);
     if (!acaraId) {
       showToast("Pilih acara terlebih dahulu!", "error");
       return;
     }
-    updateGuest(editingGuest.id, {
-      nama: newGuest.nama,
-      instansi: newGuest.instansi,
-      no_hp: newGuest.no_hp,
-      kategori_tamu: newGuest.kategori_tamu,
-      acara_id: acaraId,
-    });
-    logActivity({ action: "update_guest", detail: `Mengedit tamu "${newGuest.nama}"` });
-    setShowModal(false);
-    setEditingGuest(null);
-    setNewGuest({ nama: "", instansi: "", no_hp: "", kategori_tamu: "reguler", acara_id: "" });
-    showToast("Tamu berhasil diperbarui!");
+    try {
+      await updateGuest(editingGuest.id, {
+        nama: newGuest.nama,
+        instansi: newGuest.instansi,
+        no_hp: newGuest.no_hp,
+        kategori_tamu: newGuest.kategori_tamu,
+        acara_id: acaraId,
+      });
+      await logActivity({ action: "update_guest", detail: `Mengedit tamu "${newGuest.nama}"` });
+      setShowModal(false);
+      setEditingGuest(null);
+      setNewGuest({ nama: "", instansi: "", no_hp: "", kategori_tamu: "reguler", acara_id: "" });
+      showToast("Tamu berhasil diperbarui!");
+    } catch {
+      showToast("Gagal memperbarui tamu. Silakan coba lagi.", "error");
+    }
   };
 
   const handleDelete = (id) => {
     setConfirmDeleteId(id);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     const deleted = guests.find((g) => g.id === confirmDeleteId);
-    deleteGuest(confirmDeleteId);
-    if (deleted) logActivity({ action: "delete_guest", detail: `Menghapus tamu "${deleted.nama}"` });
-    setConfirmDeleteId(null);
-    showToast("Tamu berhasil dihapus!");
+    try {
+      await deleteGuest(confirmDeleteId);
+      if (deleted) await logActivity({ action: "delete_guest", detail: `Menghapus tamu "${deleted.nama}"` });
+      setConfirmDeleteId(null);
+      showToast("Tamu berhasil dihapus!");
+    } catch {
+      setConfirmDeleteId(null);
+      showToast("Gagal menghapus tamu. Silakan coba lagi.", "error");
+    }
   };
 
   const handleBulkSendQR = async () => {
@@ -132,7 +141,7 @@ export default function GuestsPage() {
     }
   };
 
-  const handleAddGuest = (e) => {
+  const handleAddGuest = async (e) => {
     e.preventDefault();
     const acaraId = eventFilter ? parseInt(eventFilter) : parseInt(newGuest.acara_id);
     if (!acaraId) {
@@ -150,11 +159,15 @@ export default function GuestsPage() {
       acara_id: acaraId,
       qr_token: generateToken(),
     };
-    addGuest(guest);
-    logActivity({ action: "create_guest", detail: `Menambah tamu "${guest.nama}"` });
-    setShowModal(false);
-    setNewGuest({ nama: "", instansi: "", no_hp: "", kategori_tamu: "reguler", acara_id: "" });
-    showToast("Tamu berhasil ditambahkan!");
+    try {
+      await addGuest(guest);
+      await logActivity({ action: "create_guest", detail: `Menambah tamu "${guest.nama}"` });
+      setShowModal(false);
+      setNewGuest({ nama: "", instansi: "", no_hp: "", kategori_tamu: "reguler", acara_id: "" });
+      showToast("Tamu berhasil ditambahkan!");
+    } catch {
+      showToast("Gagal menambahkan tamu. Silakan coba lagi.", "error");
+    }
   };
 
   const sanitizeCSV = (value) => {
