@@ -189,8 +189,9 @@ function HomePageContent() {
             </h1>
 
             <p className="login-fade-up login-delay-3 mt-4 max-w-[520px] text-[15px] leading-[1.8] text-white/85 lg:text-base">
-              Tamuku membantu proses pencatatan tamu, QR Check-in, monitoring
-              kehadiran, serta pelaporan acara secara realtime.
+          Platform buku tamu digital untuk registrasi tamu,
+QR Check-in, monitoring kehadiran,
+dan pelaporan acara secara realtime.
             </p>
 
             <div className="login-fade-up login-delay-4 mt-5 flex flex-col gap-3">
