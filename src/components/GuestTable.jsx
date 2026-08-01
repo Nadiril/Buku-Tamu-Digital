@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Input from "./Input";
 import Button from "./Button";
+import { QRCodeCanvas } from "qrcode.react";
 
 const kategoriMap = {
   reguler: { badge: "bg-info-muted text-info border border-info/20", label: "Reguler" },
@@ -28,6 +29,7 @@ export default function GuestTable({ guests, showEvent = false, events = [], onE
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const menuRef = useRef(null);
   const triggerRefs = useRef({});
+  const qrCanvasRef = useRef(null);
 
   useEffect(() => {
     if (!openMenuId) return;
@@ -517,11 +519,14 @@ export default function GuestTable({ guests, showEvent = false, events = [], onE
             <p className="text-sm font-medium text-foreground mb-1">{qrGuest.nama}</p>
             <p className="text-xs text-muted mb-4">{getEventName(qrGuest.acara_id)}</p>
             <div className="bg-white rounded-xl p-3 inline-block mx-auto">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(getQrUrl(qrGuest.qr_token))}`}
-                alt={`QR Code ${qrGuest.nama}`}
-                className="w-48 h-48 mx-auto"
+              <QRCodeCanvas
+                ref={qrCanvasRef}
+                value={getQrUrl(qrGuest.qr_token)}
+                size={192}
+                bgColor="#ffffff"
+                fgColor="#000000"
+                level="M"
+                marginSize={2}
               />
             </div>
             <div className="flex gap-3 pt-4">
@@ -530,10 +535,23 @@ export default function GuestTable({ guests, showEvent = false, events = [], onE
                 variant="secondary"
                 className="flex-1"
                 onClick={() => {
-                  const a = document.createElement("a");
-                  a.href = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(getQrUrl(qrGuest.qr_token))}`;
-                  a.download = `qr-${qrGuest.nama.replace(/\s+/g, "-")}.png`;
-                  a.click();
+                  const canvas = qrCanvasRef.current;
+                  if (!canvas) return;
+                  const fileName = `qr-${qrGuest.nama}-${getEventName(qrGuest.acara_id)}.png`.replace(/[\s/\\]+/g, "-").replace(/[^a-zA-Z0-9\-]/g, "");
+                  const out = document.createElement("canvas");
+                  out.width = 500;
+                  out.height = 500;
+                  out.getContext("2d").imageSmoothingEnabled = false;
+                  out.getContext("2d").drawImage(canvas, 0, 0, 500, 500);
+                  out.toBlob((blob) => {
+                    if (!blob) return;
+                    const objectUrl = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = objectUrl;
+                    a.download = fileName;
+                    a.click();
+                    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+                  });
                 }}
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
