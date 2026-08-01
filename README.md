@@ -15,7 +15,6 @@
 | Fitur | Deskripsi |
 |-------|-----------|
 | **Multi-Event** | Kelola banyak acara dalam satu platform |
-| **Registrasi Mandiri** | Tamu isi data sendiri via link acara (`/event/[slug]`) |
 | **QR Code** | Setiap tamu mendapat QR Code unik untuk scan kehadiran |
 | **Scan Kehadiran** | Panitia scan QR tamu untuk menandai hadir/terlambat |
 | **Grace Period** | Konfigurasi tolerasi keterlambatan per acara |
