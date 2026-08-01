@@ -15,7 +15,6 @@
 | Fitur | Deskripsi |
 |-------|-----------|
 | **Multi-Event** | Kelola banyak acara dalam satu platform |
-| **Registrasi Mandiri** | Tamu isi data sendiri via link acara (`/event/[slug]`) |
 | **QR Code** | Setiap tamu mendapat QR Code unik untuk scan kehadiran |
 | **Scan Kehadiran** | Panitia scan QR tamu untuk menandai hadir/terlambat |
 | **Grace Period** | Konfigurasi tolerasi keterlambatan per acara |
@@ -249,12 +248,6 @@ npm run lint
 2. **Scan** → Scan QR Code tamu saat acara berlangsung
 3. **Events** → Lihat daftar acara yang sedang aktif
 4. **History** → Riwayat scan yang sudah dilakukan
-
-### Untuk Tamu (Publik)
-
-1. Admin membagikan link acara: `/event/[slug]`
-2. Tamu mengisi form: Nama, Instansi, Tujuan, No. HP
-3. Data tersimpan, siap di-scan QR-nya oleh panitia
 
 ### Proses Scan QR
 
