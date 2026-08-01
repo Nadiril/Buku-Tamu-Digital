@@ -524,7 +524,6 @@ export default function GuestTable({ guests, showEvent = false, events = [], onE
                 className="w-48 h-48 mx-auto"
               />
             </div>
-            <p className="text-xs text-muted mt-3 break-all">{getQrUrl(qrGuest.qr_token)}</p>
             <div className="flex gap-3 pt-4">
               <Button
                 type="button"
