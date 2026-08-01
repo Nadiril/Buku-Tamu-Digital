@@ -249,12 +249,6 @@ npm run lint
 3. **Events** → Lihat daftar acara yang sedang aktif
 4. **History** → Riwayat scan yang sudah dilakukan
 
-### Untuk Tamu (Publik)
-
-1. Admin membagikan link acara: `/event/[slug]`
-2. Tamu mengisi form: Nama, Instansi, Tujuan, No. HP
-3. Data tersimpan, siap di-scan QR-nya oleh panitia
-
 ### Proses Scan QR
 
 1. Tamu datang ke lokasi acara
